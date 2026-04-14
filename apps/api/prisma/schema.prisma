@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── 유저 ──────────────────────────────────────────────────────
+model User {
+  id            String  @id @default(uuid())
+  email         String  @unique
+  passwordHash  String?
+  nickname      String
+  profileImage  String?
+  bio           String?
+  provider      String  @default("local") // local | google | kakao
+  providerId    String?
+  role          String  @default("USER")  // USER | ADMIN
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  todos             Todo[]
+  todoCategories    TodoCategory[]
+  pomodoroSettings  PomodoroSettings?
+  crewMembers       CrewMember[]
+  messages          Message[]
+  posts             Post[]
+  comments          Comment[]
+  reactions         Reaction[]
+  notifications     Notification[]
+  pomoParticipants  PomodoroParticipant[]
+  reports           Report[]  @relation("ReporterReports")
+
+  @@map("users")
+}
+
+// ── 개인 포모도로 설정 ────────────────────────────────────────
+model PomodoroSettings {
+  id                  String  @id @default(uuid())
+  userId              String  @unique
+  workMinutes         Int     @default(25)
+  shortBreakMinutes   Int     @default(5)
+  longBreakMinutes    Int     @default(15)
+  longBreakInterval   Int     @default(4)
+  autoStartBreak      Boolean @default(false)
+  autoStartWork       Boolean @default(false)
+  soundEnabled        Boolean @default(true)
+  soundVolume         Int     @default(80)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("pomodoro_settings")
+}
+
+// ── 할일 카테고리 ─────────────────────────────────────────────
+model TodoCategory {
+  id     String @id @default(uuid())
+  userId String
+  name   String
+  color  String
+  order  Int    @default(0)
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  todos Todo[]
+
+  @@map("todo_categories")
+}
+
+// ── 할일 ──────────────────────────────────────────────────────
+model Todo {
+  id          String    @id @default(uuid())
+  userId      String
+  categoryId  String?
+  title       String
+  description String?
+  dueDate     DateTime?
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category TodoCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments Comment[]
+  reactions Reaction[]
+
+  @@map("todos")
+}
+
+// ── 크루 ──────────────────────────────────────────────────────
+model Crew {
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  emoji         String   @default("🏠")
+  themeColor    String   @default("#7c6ff7")
+  bannerImage   String?
+  category      String
+  visibility    String   @default("PUBLIC") // PUBLIC | PASSWORD | PRIVATE
+  passwordHash  String?
+  inviteCode    String   @unique @default(uuid())
+  maxMembers    Int      @default(20)
+  tags          String[]
+  rules         String?
+  isDeleted     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members          CrewMember[]
+  channels         Channel[]
+  posts            Post[]
+  pomodoroSessions PomodoroSession[]
+
+  @@map("crews")
+}
+
+// ── 크루 멤버 ─────────────────────────────────────────────────
+model CrewMember {
+  id       String @id @default(uuid())
+  crewId   String
+  userId   String
+  role     String @default("MEMBER") // OWNER | ADMIN | MEMBER
+  joinedAt DateTime @default(now())
+
+  crew Crew @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([crewId, userId])
+  @@map("crew_members")
+}
+
+// ── 채팅 채널 ─────────────────────────────────────────────────
+model Channel {
+  id     String @id @default(uuid())
+  crewId String
+  name   String
+  type   String @default("GENERAL") // GENERAL | NOTICE | GOAL
+  order  Int    @default(0)
+
+  crew     Crew      @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("channels")
+}
+
+// ── 채팅 메시지 ───────────────────────────────────────────────
+model Message {
+  id          String  @id @default(uuid())
+  channelId   String
+  userId      String
+  content     String
+  type        String  @default("TEXT") // TEXT | IMAGE | FILE | SYSTEM | TODO_COMPLETE
+  fileUrl     String?  // S3 URL (이미지/파일)
+  fileName    String?  // 원본 파일명
+  fileSize    Int?     // bytes
+  fileMimeType String? // MIME type
+  metadata    Json?
+  isEdited    Boolean @default(false)
+  isDeleted   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channel Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id])
+  reports Report[]
+
+  @@map("messages")
+}
+
+// ── 신고 ──────────────────────────────────────────────────────
+model Report {
+  id         String  @id @default(uuid())
+  reporterId String
+  targetType String  // MESSAGE | POST | COMMENT | USER
+  messageId  String?
+  postId     String?
+  commentId  String?
+  targetUserId String?
+  reason     String  // SPAM | ABUSE | HATE | INAPPROPRIATE | OTHER
+  detail     String?
+  status     String  @default("PENDING") // PENDING | REVIEWED | DISMISSED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reporter    User      @relation("ReporterReports", fields: [reporterId], references: [id])
+  message     Message?  @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  post        Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
+  comment     Comment?  @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  @@map("reports")
+}
+
+// ── 게시글 ────────────────────────────────────────────────────
+model Post {
+  id        String   @id @default(uuid())
+  crewId    String
+  userId    String
+  content   String
+  imageUrls String[]
+  isPinned  Boolean  @default(false)
+  isDeleted Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  crew      Crew       @relation(fields: [crewId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id])
+  comments  Comment[]
+  reactions Reaction[]
+  reports   Report[]
+
+  @@map("posts")
+}
+
+// ── 댓글 (할일/게시글 통합) ────────────────────────────────────
+model Comment {
+  id         String  @id @default(uuid())
+  userId     String
+  targetType String  // TODO | POST
+  todoId     String?
+  postId     String?
+  parentId   String?
+  content    String
+  isDeleted  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id])
+  todo      Todo?      @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  post      Post?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent    Comment?   @relation("replies", fields: [parentId], references: [id])
+  replies   Comment[]  @relation("replies")
+  reactions Reaction[]
+  reports   Report[]
+
+  @@map("comments")
+}
+
+// ── 반응 (좋아요/싫어요 통합) ──────────────────────────────────
+model Reaction {
+  id         String  @id @default(uuid())
+  userId     String
+  targetType String  // TODO | POST | COMMENT
+  todoId     String?
+  postId     String?
+  commentId  String?
+  type       String  // LIKE | DISLIKE
+
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  todo    Todo?    @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, todoId])
+  @@unique([userId, targetType, postId])
+  @@unique([userId, targetType, commentId])
+  @@map("reactions")
+}
+
+// ── 크루 공유 포모도로 세션 ────────────────────────────────────
+model PomodoroSession {
+  id           String @id @default(uuid())
+  crewId       String
+  startedById  String
+  workMinutes  Int    @default(25)
+  breakMinutes Int    @default(5)
+  status       String @default("RUNNING") // RUNNING | PAUSED | DONE
+
+  startedAt DateTime @default(now())
+  endsAt    DateTime
+
+  crew         Crew                  @relation(fields: [crewId], references: [id])
+  participants PomodoroParticipant[]
+
+  @@map("pomodoro_sessions")
+}
+
+model PomodoroParticipant {
+  id        String   @id @default(uuid())
+  sessionId String
+  userId    String
+  joinedAt  DateTime @default(now())
+
+  session PomodoroSession @relation(fields: [sessionId], references: [id])
+  user    User            @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+  @@map("pomodoro_participants")
+}
+
+// ── 알림 ──────────────────────────────────────────────────────
+model Notification {
+  id        String  @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
