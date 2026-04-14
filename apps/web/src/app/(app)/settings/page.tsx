@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera, LogOut, Trash2, Plus } from 'lucide-react';
+import { useDialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
@@ -17,6 +18,7 @@ interface Category { id: string; name: string; color: string }
 
 export default function SettingsPage() {
   const { user, setUser, logout } = useAuthStore();
+  const { confirm } = useDialog();
   const router = useRouter();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -92,7 +94,8 @@ export default function SettingsPage() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm('카테고리를 삭제할까요?')) return;
+    const ok = await confirm({ title: '카테고리 삭제', message: '이 카테고리를 삭제할까요?', confirmText: '삭제', cancelText: '취소', type: 'danger' });
+    if (!ok) return;
     try {
       await api.delete(`/todo-categories/${id}`);
       qc.invalidateQueries({ queryKey: ['todo-categories'] });
@@ -100,73 +103,65 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin">
-      <div className="max-w-xl mx-auto px-4 py-6 pb-20 md:pb-6 space-y-6">
-        <h1 className="text-xl font-bold text-gray-900">설정</h1>
+    <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">
+      <div className="max-w-xl mx-auto px-4 py-6 pb-20 md:pb-6 space-y-4">
+        <h1 className="text-lg font-bold text-gray-900 px-1">설정</h1>
 
-        {/* Stats */}
-        {stats && (
-          <section className="card p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">내 활동</h2>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">완료한 할일</span>
-                <span className="text-sm font-semibold text-gray-900">{stats.totalCompleted}개</span>
+        {/* Profile + Stats combined */}
+        <section className="card overflow-hidden">
+          {/* Profile header */}
+          <div className="px-5 pt-5 pb-4 border-b border-gray-50">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative">
+                <Avatar src={user?.profileImage} fallback={user?.nickname} size="lg" />
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full bg-primary-500 text-white flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors"
+                >
+                  <Camera className="h-3 w-3" />
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">이번 달 달성률</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-400 rounded-full" style={{ width: `${stats.monthPct}%` }} />
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900">{user?.nickname}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            {stats && (
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: '완료', value: `${stats.totalCompleted}개` },
+                  { label: '이번달', value: `${stats.monthPct}%` },
+                  { label: '크루', value: `${stats.crewCount}개` },
+                  { label: '연속', value: `${stats.streak}일` },
+                ].map((s) => (
+                  <div key={s.label} className="text-center py-2.5 bg-gray-50 rounded-xl">
+                    <p className="text-base font-bold text-gray-900">{s.value}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{s.label}</p>
                   </div>
-                  <span className="text-sm font-semibold text-gray-900 w-9 text-right">{stats.monthPct}%</span>
-                </div>
+                ))}
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-500">참여 중인 크루</span>
-                <span className="text-sm font-semibold text-gray-900">{stats.crewCount}개</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-500">연속 달성</span>
-                <span className="text-sm font-semibold text-gray-900">{stats.streak}일째</span>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Profile */}
-        <section className="card p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700">프로필</h2>
-
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Avatar src={user?.profileImage} fallback={user?.nickname} size="lg" />
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary-500 text-white flex items-center justify-center shadow-sm hover:bg-primary-600 transition-colors"
-              >
-                <Camera className="h-3.5 w-3.5" />
-              </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">{user?.nickname}</p>
-              <p className="text-xs text-gray-400">{user?.email}</p>
-            </div>
+            )}
           </div>
 
-          <Input label="닉네임" value={nickname} onChange={(e) => setNickname(e.target.value)} />
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-gray-700">소개</label>
-            <textarea
-              className="input-field resize-none"
-              rows={3}
-              placeholder="간단한 소개를 작성하세요"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-            />
+          {/* Edit form */}
+          <div className="px-5 py-4 space-y-3">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">프로필 수정</h2>
+            <Input label="닉네임" value={nickname} onChange={(e) => setNickname(e.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-gray-700">소개</label>
+              <textarea
+                className="input-field resize-none"
+                rows={2}
+                placeholder="간단한 소개를 작성하세요"
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleSaveProfile} className="w-full">저장</Button>
           </div>
-          <Button onClick={handleSaveProfile}>저장</Button>
         </section>
 
         {/* Categories */}

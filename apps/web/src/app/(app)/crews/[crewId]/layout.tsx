@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hash, ArrowLeft, ChevronDown, ChevronRight, Play, Pause, Square, Timer } from 'lucide-react';
+import { Hash, ArrowLeft, ChevronDown, ChevronRight, Play, Pause, Square, RotateCcw } from 'lucide-react';
 import { cn, formatSeconds, resolveUrl } from '@/lib/utils';
+import { useDialog } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
 import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
@@ -19,6 +20,7 @@ interface PomoState { sessionId: string; startedById: string; workMinutes: numbe
 function CrewPomoPanel({ crewId }: { crewId: string }) {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const { confirm } = useDialog();
   const [pomoState, setPomoState] = useState<PomoState | null>(null);
   const [pomoSeconds, setPomoSeconds] = useState(0);
   const [pomoWork, setPomoWork] = useState(25);
@@ -38,7 +40,12 @@ function CrewPomoPanel({ crewId }: { crewId: string }) {
 
   useEffect(() => {
     if (!pomoState || pomoState.status !== 'RUNNING') return;
-    const id = setInterval(() => setPomoSeconds(Math.max(0, Math.floor((pomoState.endsAt - Date.now()) / 1000))), 500);
+    const id = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((pomoState.endsAt - Date.now()) / 1000));
+      setPomoSeconds(remaining);
+      // 타이머 자연 만료 감지 — 서버는 Redis 삭제만 하고 이벤트를 안 보내므로 프론트에서 처리
+      if (remaining === 0) setPomoState(null);
+    }, 500);
     return () => clearInterval(id);
   }, [pomoState]);
 
@@ -47,85 +54,107 @@ function CrewPomoPanel({ crewId }: { crewId: string }) {
     getSocket(accessToken).emit(event, payload);
   };
 
+  const handleEnd = async () => {
+    const ok = await confirm({ title: '세션 종료', message: '진행 중인 포모도로를 종료할까요?', confirmText: '종료', cancelText: '취소', type: 'danger' });
+    if (!ok) return;
+    // 낙관적 업데이트: 서버 응답 기다리지 않고 즉시 UI 초기화
+    setPomoState(null);
+    emitPomo('pomo:end', { crewId });
+  };
+
   const isStarter = user?.id === pomoState?.startedById;
+  const isRunning = pomoState?.status === 'RUNNING';
+  const isPaused = pomoState?.status === 'PAUSED';
   const total = (pomoState?.workMinutes ?? pomoWork) * 60;
   const pct = pomoState ? ((total - pomoSeconds) / total) * 100 : 0;
-  const cir = 2 * Math.PI * 22;
+  const circumference = 2 * Math.PI * 40;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+  const stroke = isPaused ? '#f59e0b' : '#7c6ff7';
 
   return (
-    <div className="p-3 border-b border-gray-100">
-      <div className="flex items-center gap-1.5 mb-3">
-        <Timer className="h-3.5 w-3.5 text-primary-500" />
+    <div className="p-4 border-b border-gray-100">
+      <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-semibold text-gray-700">크루 포모도로</span>
+        {pomoState && isStarter && (
+          <button onClick={handleEnd} className="h-6 w-6 rounded flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors">
+            <Square className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {!pomoState ? (
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-gray-400">
-            <span className="font-bold text-lg text-gray-300">{formatSeconds(pomoWork * 60)}</span>
+        <div className="flex flex-col items-center py-1 gap-3">
+          {/* 원형 + 시간 표시 (비활성) */}
+          <div className="relative">
+            <svg width="96" height="96" className="-rotate-90">
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#e5e7eb" strokeWidth="6" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xl font-bold tabular-nums text-gray-300">{formatSeconds(pomoWork * 60)}</span>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <div className="flex flex-col items-center gap-0.5">
+          {/* 시간 설정 */}
+          <div className="flex gap-3">
+            <div className="flex flex-col items-center gap-1">
               <span className="text-[10px] text-gray-400">집중</span>
               <input type="number" min={1} max={90} value={pomoWork}
                 onChange={(e) => setPomoWork(+e.target.value)}
-                className="input-field w-12 text-center text-xs py-1" />
+                className="input-field w-14 text-center text-xs py-1" />
             </div>
-            <div className="flex flex-col items-center gap-0.5">
+            <div className="flex flex-col items-center gap-1">
               <span className="text-[10px] text-gray-400">휴식</span>
               <input type="number" min={1} max={30} value={pomoBreak}
                 onChange={(e) => setPomoBreak(+e.target.value)}
-                className="input-field w-12 text-center text-xs py-1" />
+                className="input-field w-14 text-center text-xs py-1" />
             </div>
           </div>
           <button
             onClick={() => emitPomo('pomo:start', { crewId, workMinutes: pomoWork, breakMinutes: pomoBreak })}
-            className="flex items-center gap-1 px-3 py-1.5 bg-primary-500 text-white rounded-lg text-xs font-medium hover:bg-primary-600 transition-colors"
+            className="h-10 w-10 rounded-full bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-sm transition-colors"
           >
-            <Play className="h-3 w-3" /> 시작
+            <Play className="h-4 w-4 ml-0.5" />
           </button>
+          <p className="text-xs text-gray-400">{pomoWork}분 집중 · {pomoBreak}분 휴식</p>
         </div>
       ) : (
-        <div className="flex items-center gap-3">
-          <div className="relative shrink-0">
-            <svg width="52" height="52" className="-rotate-90">
-              <circle cx="26" cy="26" r="22" fill="none" stroke="#e5e7eb" strokeWidth="4" />
-              <circle cx="26" cy="26" r="22" fill="none"
-                stroke={pomoState.status === 'PAUSED' ? '#f59e0b' : '#7c6ff7'}
-                strokeWidth="4" strokeLinecap="round"
-                strokeDasharray={cir} strokeDashoffset={cir - (pct / 100) * cir}
+        <div className="flex flex-col items-center py-1 gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isPaused ? 'bg-amber-50 text-amber-600' : 'bg-primary-50 text-primary-600'}`}>
+              {isPaused ? '일시정지' : '집중 중'} · {pomoState.workMinutes}분
+            </span>
+          </div>
+          {/* 원형 타이머 */}
+          <div className="relative">
+            <svg width="96" height="96" className="-rotate-90">
+              <circle cx="48" cy="48" r="40" fill="none" stroke="#e5e7eb" strokeWidth="6" />
+              <circle cx="48" cy="48" r="40" fill="none"
+                stroke={stroke} strokeWidth="6" strokeLinecap="round"
+                strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
                 className="transition-all duration-500" />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[10px] font-bold tabular-nums text-gray-700">{formatSeconds(pomoSeconds)}</span>
+              <span className={`text-xl font-bold tabular-nums ${isPaused ? 'text-amber-500' : 'text-primary-600'}`}>
+                {formatSeconds(pomoSeconds)}
+              </span>
             </div>
           </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500 mb-1.5">
-              {pomoState.status === 'RUNNING' ? '집중 세션 중' : '일시정지'}
-            </p>
-            {isStarter ? (
-              <div className="flex gap-1.5">
-                {pomoState.status === 'RUNNING' ? (
-                  <button onClick={() => emitPomo('pomo:pause', { crewId })}
-                    className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-medium hover:bg-amber-200">
-                    <Pause className="h-3 w-3 inline" /> 정지
-                  </button>
-                ) : (
-                  <button onClick={() => emitPomo('pomo:resume', { crewId })}
-                    className="px-2 py-1 bg-primary-100 text-primary-700 rounded text-[10px] font-medium hover:bg-primary-200">
-                    <Play className="h-3 w-3 inline" /> 재개
-                  </button>
-                )}
-                <button onClick={() => { if (confirm('종료?')) emitPomo('pomo:end', { crewId }); }}
-                  className="px-2 py-1 bg-red-50 text-red-500 rounded text-[10px] font-medium hover:bg-red-100">
-                  <Square className="h-3 w-3 inline" /> 종료
-                </button>
-              </div>
-            ) : (
-              <p className="text-[10px] text-gray-400">시작자만 제어 가능</p>
-            )}
-          </div>
+          {/* 컨트롤 */}
+          {isStarter ? (
+            <div className="flex items-center gap-3">
+              <button onClick={() => emitPomo('pomo:end', { crewId })}
+                className="h-8 w-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors">
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => isRunning ? emitPomo('pomo:pause', { crewId }) : emitPomo('pomo:resume', { crewId })}
+                className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm transition-colors text-white ${isPaused ? 'bg-amber-400 hover:bg-amber-500' : 'bg-primary-500 hover:bg-primary-600'}`}
+              >
+                {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">시작자만 제어 가능</p>
+          )}
         </div>
       )}
     </div>
@@ -176,18 +205,21 @@ export default function CrewLayout({
       <aside className="hidden md:flex flex-col w-52 border-r border-gray-100 bg-white shrink-0 overflow-y-auto scrollbar-thin">
         {/* Crew header */}
         <div className="p-3 border-b border-gray-100">
-          <Link href="/crews" className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-600 mb-2 transition-colors">
+          <Link href="/crews" className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 mb-3 transition-colors">
             <ArrowLeft className="h-3 w-3" /> 크루 목록
           </Link>
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary-100 flex items-center justify-center shrink-0 overflow-hidden">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-primary-100 flex items-center justify-center shrink-0 overflow-hidden border border-gray-100">
               {crew?.bannerImage
                 ? <img src={resolveUrl(crew.bannerImage)} alt={crew.name} className="w-full h-full object-cover" />
                 : <span className="text-sm font-bold text-primary-600">{crew?.name?.charAt(0) ?? '?'}</span>
               }
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-gray-900 text-sm truncate">{crew?.name}</p>
+              <p className="font-bold text-gray-900 text-sm truncate">{crew?.name}</p>
+              {crew?.description && (
+                <p className="text-[11px] text-gray-400 truncate mt-0.5">{crew.description}</p>
+              )}
             </div>
           </div>
         </div>
@@ -196,7 +228,7 @@ export default function CrewLayout({
           {/* Channels section */}
           <button
             onClick={() => setChannelsOpen(!channelsOpen)}
-            className="flex items-center justify-between w-full px-2 py-1 text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+            className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wide"
           >
             <span>채널</span>
             {channelsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -204,34 +236,34 @@ export default function CrewLayout({
           {channelsOpen && channels.map((ch) => (
             <Link key={ch.id} href={`/crews/${crewId}/channels/${ch.id}`}
               className={cn(
-                'flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors',
-                pathname.includes(ch.id) ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50',
+                'flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm transition-colors',
+                pathname.includes(ch.id) ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
               )}
             >
-              <Hash className="h-3.5 w-3.5 shrink-0 opacity-50" />
+              <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
               <span className="truncate">{ch.name}</span>
             </Link>
           ))}
 
           {/* Member progress */}
           {stats.length > 0 && (
-            <div className="pt-2 mt-1 border-t border-gray-100">
+            <div className="pt-2 mt-2 border-t border-gray-100">
               <button
                 onClick={() => setMembersOpen(!membersOpen)}
-                className="flex items-center justify-between w-full px-2 py-1 text-[11px] font-semibold text-gray-400 hover:text-gray-600"
+                className="flex items-center justify-between w-full px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wide"
               >
                 <span>오늘 달성률</span>
                 {membersOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
               </button>
               {membersOpen && (
-                <div className="mt-1 space-y-2 px-1">
+                <div className="mt-1.5 space-y-2.5 px-1">
                   {stats.map((m) => (
                     <div key={m.userId} className="flex items-center gap-2">
                       <Avatar src={m.profileImage} fallback={m.nickname} size="xs" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[11px] text-gray-600 truncate">{m.nickname}</span>
-                          <span className={cn('text-[11px] font-semibold shrink-0 ml-1', m.pct === 100 ? 'text-green-500' : 'text-primary-500')}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[11px] text-gray-600 truncate font-medium">{m.nickname}</span>
+                          <span className={cn('text-[11px] font-bold shrink-0 ml-1', m.pct === 100 ? 'text-green-500' : 'text-primary-500')}>
                             {m.total === 0 ? '-' : `${m.pct}%`}
                           </span>
                         </div>
@@ -254,7 +286,7 @@ export default function CrewLayout({
 
         {/* Bottom */}
         <div className="p-3 border-t border-gray-100">
-          <Link href="/crews" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary-500 transition-colors">
+          <Link href="/crews" className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-primary-500 transition-colors font-medium">
             <span>+ 다른 크루 찾기</span>
           </Link>
         </div>
@@ -290,7 +322,7 @@ export default function CrewLayout({
 
             {/* Latest post activity */}
             <div className="p-3">
-              <p className="text-[11px] font-semibold text-gray-400 mb-2">게시판 활동</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5 px-1">게시판 활동</p>
               <LatestPostPanel crewId={crewId} />
             </div>
           </div>
@@ -311,21 +343,21 @@ function LatestPostPanel({ crewId }: { crewId: string }) {
   });
 
   if (!data?.length) {
-    return <p className="text-xs text-gray-400">아직 게시글이 없습니다.</p>;
+    return <p className="text-xs text-gray-400 px-1">아직 게시글이 없습니다.</p>;
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {data.map((post: any) => (
         <Link key={post.id} href={`/crews/${crewId}/board`}
-          className="block p-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+          className="block p-2.5 rounded-xl hover:bg-gray-50 transition-colors border border-gray-100"
         >
-          <div className="flex items-center gap-1.5 mb-1">
+          <div className="flex items-center gap-1.5 mb-1.5">
             <Avatar src={post.user?.profileImage} fallback={post.user?.nickname ?? '?'} size="xs" />
-            <span className="text-[11px] font-medium text-gray-700 truncate">{post.user?.nickname}</span>
+            <span className="text-[11px] font-semibold text-gray-700 truncate">{post.user?.nickname}</span>
           </div>
-          <p className="text-xs text-gray-600 line-clamp-2">{post.content}</p>
-          <div className="flex items-center gap-2 mt-1">
+          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{post.content}</p>
+          <div className="flex items-center gap-2.5 mt-1.5">
             <span className="text-[10px] text-gray-400">👍 {post._count?.reactions ?? 0}</span>
             <span className="text-[10px] text-gray-400">💬 {post._count?.comments ?? 0}</span>
           </div>

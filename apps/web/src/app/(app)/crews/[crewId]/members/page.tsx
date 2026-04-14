@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
+import { useDialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
@@ -26,16 +27,10 @@ interface Todo {
   reactions: TodoReaction[];
 }
 
-const roleIcon: Record<string, React.ReactNode> = {
-  OWNER: <Crown className="h-3.5 w-3.5 text-amber-500" />,
-  ADMIN: <Shield className="h-3.5 w-3.5 text-blue-500" />,
-  MEMBER: <User className="h-3.5 w-3.5 text-gray-400" />,
-};
-
-const roleLabel: Record<string, string> = {
-  OWNER: '오너',
-  ADMIN: '관리자',
-  MEMBER: '멤버',
+const roleConfig: Record<string, { icon: React.ReactNode; label: string; bg: string; text: string }> = {
+  OWNER: { icon: <Crown className="h-3 w-3" />, label: '오너', bg: 'bg-amber-50', text: 'text-amber-600' },
+  ADMIN: { icon: <Shield className="h-3 w-3" />, label: '관리자', bg: 'bg-blue-50', text: 'text-blue-600' },
+  MEMBER: { icon: <User className="h-3 w-3" />, label: '멤버', bg: 'bg-gray-100', text: 'text-gray-500' },
 };
 
 function formatDateKr(date: Date) {
@@ -101,6 +96,11 @@ function MemberTodosPanel({
 
   const pending = todos.filter((t) => !t.isCompleted);
   const completed = todos.filter((t) => t.isCompleted);
+  const doneCount = completed.length;
+  const totalCount = todos.length;
+  const pct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
+  const rc = roleConfig[member.role] ?? roleConfig.MEMBER;
 
   const TodoRow = ({ todo }: { todo: Todo }) => {
     const myLike = todo.reactions.find((r) => r.userId === me?.id && r.type === 'LIKE');
@@ -110,39 +110,58 @@ function MemberTodosPanel({
     const isExpanded = expandedTodo === todo.id;
 
     return (
-      <div className={cn('border border-gray-100 rounded-xl p-3 space-y-2', todo.isCompleted && 'opacity-60')}>
-        <div className="flex items-start gap-2">
-          <div className={cn('mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center',
-            todo.isCompleted ? 'bg-primary-500 border-primary-500' : 'border-gray-300')}>
+      <div className={cn('rounded-xl border border-gray-100 bg-white p-3 space-y-2', todo.isCompleted && 'opacity-55')}>
+        <div className="flex items-start gap-2.5">
+          <div className={cn(
+            'mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all',
+            todo.isCompleted ? 'bg-primary-500 border-primary-500' : 'border-gray-300',
+          )}>
             {todo.isCompleted && <span className="text-white text-[8px] font-bold">✓</span>}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={cn('text-sm text-gray-800', todo.isCompleted && 'line-through text-gray-400')}>{todo.title}</p>
+            <p className={cn('text-sm text-gray-800 leading-snug', todo.isCompleted && 'line-through text-gray-400')}>
+              {todo.title}
+            </p>
             {todo.category && (
-              <span className="inline-block text-xs px-1.5 py-0.5 rounded-full mt-0.5"
-                style={{ backgroundColor: todo.category.color + '20', color: todo.category.color }}>
+              <span className="inline-block text-[11px] px-1.5 py-0.5 rounded-full mt-1 font-medium"
+                style={{ backgroundColor: todo.category.color + '18', color: todo.category.color }}>
                 {todo.category.name}
               </span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3 pl-6">
-          <button onClick={() => handleReact(todo.id, 'LIKE')}
-            className={cn('flex items-center gap-1 text-xs transition-colors', myLike ? 'text-primary-500 font-medium' : 'text-gray-400 hover:text-primary-400')}>
-            <ThumbsUp className="h-3.5 w-3.5" /> {likes}
+        <div className="flex items-center gap-1 pl-6">
+          <button
+            onClick={() => handleReact(todo.id, 'LIKE')}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              myLike ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-400 hover:bg-gray-50',
+            )}
+          >
+            <ThumbsUp className="h-3 w-3" /> {likes}
           </button>
-          <button onClick={() => handleReact(todo.id, 'DISLIKE')}
-            className={cn('flex items-center gap-1 text-xs transition-colors', myDislike ? 'text-red-400 font-medium' : 'text-gray-400 hover:text-red-300')}>
-            <ThumbsDown className="h-3.5 w-3.5" /> {dislikes}
+          <button
+            onClick={() => handleReact(todo.id, 'DISLIKE')}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              myDislike ? 'bg-red-50 text-red-500 font-medium' : 'text-gray-400 hover:bg-gray-50',
+            )}
+          >
+            <ThumbsDown className="h-3 w-3" /> {dislikes}
           </button>
-          <button onClick={() => toggleComments(todo.id)}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
-            <MessageCircle className="h-3.5 w-3.5" />
+          <button
+            onClick={() => toggleComments(todo.id)}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              isExpanded ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:bg-gray-50',
+            )}
+          >
+            <MessageCircle className="h-3 w-3" />
             {todo._count.comments > 0 ? todo._count.comments : ''} 댓글
           </button>
         </div>
         {isExpanded && (
-          <div className="pl-6 space-y-2 pt-1 border-t border-gray-50">
+          <div className="pl-6 space-y-2 pt-1.5 border-t border-gray-50">
             {loadingComments === todo.id ? (
               <p className="text-xs text-gray-400">불러오는 중...</p>
             ) : (comments[todo.id] ?? []).length === 0 ? (
@@ -152,19 +171,25 @@ function MemberTodosPanel({
                 <div key={c.id} className="flex items-start gap-1.5">
                   <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
                   <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                    <span className="text-xs font-medium text-gray-700">{c.user?.nickname}</span>
+                    <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
                     <p className="text-xs text-gray-600 mt-0.5">{c.content}</p>
                   </div>
                 </div>
               ))
             )}
-            <div className="flex gap-2">
-              <input className="input-field flex-1 text-xs py-1.5" placeholder="댓글..."
+            <div className="flex gap-1.5">
+              <input
+                className="input-field flex-1 text-xs py-1.5"
+                placeholder="댓글..."
                 value={commentText[todo.id] ?? ''}
                 onChange={(e) => setCommentText((prev) => ({ ...prev, [todo.id]: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && handleComment(todo.id)} />
-              <button onClick={() => handleComment(todo.id)} disabled={!commentText[todo.id]?.trim()}
-                className="px-2.5 py-1.5 bg-primary-500 text-white rounded-lg text-xs hover:bg-primary-600 disabled:opacity-40">
+                onKeyDown={(e) => e.key === 'Enter' && handleComment(todo.id)}
+              />
+              <button
+                onClick={() => handleComment(todo.id)}
+                disabled={!commentText[todo.id]?.trim()}
+                className="px-2.5 py-1.5 bg-primary-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40"
+              >
                 전송
               </button>
             </div>
@@ -176,34 +201,66 @@ function MemberTodosPanel({
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-100 w-80 shrink-0">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-        <Avatar src={member.user.profileImage} fallback={member.user.nickname} size="sm" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{member.user.nickname}</p>
-          <p className="text-xs text-gray-400">{roleLabel[member.role]}</p>
+      {/* Panel header */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <Avatar src={member.user.profileImage} fallback={member.user.nickname} size="md" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-gray-900 truncate">{member.user.nickname}</p>
+              <span className={cn('flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full', rc.bg, rc.text)}>
+                {rc.icon} {rc.label}
+              </span>
+            </div>
+            {member.user.bio && (
+              <p className="text-xs text-gray-400 truncate mt-0.5">{member.user.bio}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="h-7 w-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0">
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-          <X className="h-4 w-4" />
-        </button>
+
+        {/* Progress bar */}
+        {totalCount > 0 && (
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-gray-400">오늘 달성률</span>
+              <span className={cn('text-xs font-bold', pct === 100 ? 'text-green-500' : 'text-primary-500')}>{pct}%</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all', pct === 100 ? 'bg-green-400' : 'bg-primary-400')}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50">
-        <button onClick={() => changeDate(-1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
+
+      {/* Date nav */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50/50">
+        <button onClick={() => changeDate(-1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
           <ChevronLeft className="h-4 w-4 text-gray-500" />
         </button>
-        <span className="text-xs font-medium text-gray-700">{date}</span>
-        <button onClick={() => changeDate(1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors">
+        <span className="text-xs font-semibold text-gray-700">{date}</span>
+        <button onClick={() => changeDate(1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
           <ChevronRight className="h-4 w-4 text-gray-500" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-3 space-y-2">
+
+      {/* Todo list */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-2 bg-gray-50">
         {todos.length === 0 ? (
-          <div className="py-8 text-center text-sm text-gray-400"><p>할일이 없습니다</p></div>
+          <div className="py-10 text-center">
+            <p className="text-sm text-gray-400">할일이 없습니다</p>
+          </div>
         ) : (
           <>
             {pending.map((todo) => <TodoRow key={todo.id} todo={todo} />)}
             {completed.length > 0 && (
-              <div className="pt-2">
-                <p className="text-xs text-gray-400 mb-2">완료 ({completed.length})</p>
+              <div className="pt-1">
+                <p className="text-xs text-gray-400 px-1 mb-2">완료 {completed.length}개</p>
                 {completed.map((todo) => <TodoRow key={todo.id} todo={todo} />)}
               </div>
             )}
@@ -219,6 +276,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   const router = useRouter();
   const me = useAuthStore((s) => s.user);
   const qc = useQueryClient();
+  const { confirm } = useDialog();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
@@ -238,7 +296,14 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   });
 
   const handleKick = async (m: Member) => {
-    if (!confirm(`${m.user.nickname}님을 강퇴할까요?`)) return;
+    const ok = await confirm({
+      title: '멤버 강퇴',
+      message: `${m.user.nickname}님을 크루에서 강퇴할까요?`,
+      confirmText: '강퇴',
+      cancelText: '취소',
+      type: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/crews/${crewId}/members/${m.user.id}`);
       if (selectedMember?.id === m.id) setSelectedMember(null);
@@ -246,52 +311,68 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
       refetch();
       qc.invalidateQueries({ queryKey: ['crew-today-stats', crewId] });
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? '강퇴에 실패했습니다.');
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '강퇴에 실패했습니다.', confirmText: '확인', type: 'alert' });
     }
   };
 
   const handleLeave = async () => {
-    if (!confirm('크루에서 탈퇴할까요?')) return;
+    const ok = await confirm({
+      title: '크루 탈퇴',
+      message: '정말 크루에서 탈퇴할까요?',
+      confirmText: '탈퇴',
+      cancelText: '취소',
+      type: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/crews/${crewId}/leave`);
       qc.invalidateQueries({ queryKey: ['my-crews'] });
       router.push('/crews');
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? '탈퇴에 실패했습니다.');
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '탈퇴에 실패했습니다.', confirmText: '확인', type: 'alert' });
     }
   };
 
   const handleDeleteCrew = async () => {
-    if (!confirm('크루를 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
+    const ok = await confirm({
+      title: '크루 삭제',
+      message: '크루를 삭제하면 되돌릴 수 없습니다. 정말 삭제할까요?',
+      confirmText: '삭제',
+      cancelText: '취소',
+      type: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/crews/${crewId}`);
       qc.invalidateQueries({ queryKey: ['my-crews'] });
       router.push('/crews');
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? '삭제에 실패했습니다.');
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '삭제에 실패했습니다.', confirmText: '확인', type: 'alert' });
     }
   };
 
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Member list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">
+        <div className="max-w-2xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900">멤버 {members.length}명</h2>
-            {/* 내 액션 버튼 */}
+            <div>
+              <h2 className="text-base font-bold text-gray-900">멤버</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{members.length}명</p>
+            </div>
             <div className="flex gap-2">
               {isOwner ? (
                 <button
                   onClick={handleDeleteCrew}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> 크루 삭제
                 </button>
               ) : myMember ? (
                 <button
                   onClick={handleLeave}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
                 >
                   <LogOut className="h-3.5 w-3.5" /> 탈퇴
                 </button>
@@ -299,41 +380,39 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
             </div>
           </div>
 
-          <div className="card divide-y divide-gray-100">
+          <div className="space-y-2">
             {sorted.map((m) => {
               const canKick = (isOwner || isAdmin) && m.user.id !== me?.id && m.role !== 'OWNER';
               const isMenuOpen = menuOpen === m.id;
+              const rc = roleConfig[m.role] ?? roleConfig.MEMBER;
+              const isSelected = selectedMember?.id === m.id;
 
               return (
-                <div key={m.id} className="relative flex items-center">
+                <div
+                  key={m.id}
+                  className={cn(
+                    'card-hover flex items-center overflow-hidden transition-all',
+                    isSelected && 'border-primary-200 bg-primary-50/30',
+                  )}
+                >
                   <button
-                    onClick={() => setSelectedMember(selectedMember?.id === m.id ? null : m)}
-                    className={cn(
-                      'flex flex-1 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50',
-                      selectedMember?.id === m.id && 'bg-primary-50',
-                    )}
+                    onClick={() => setSelectedMember(isSelected ? null : m)}
+                    className="flex flex-1 items-center gap-3 px-4 py-3 text-left"
                   >
                     <Avatar src={m.user.profileImage} fallback={m.user.nickname} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-gray-900">{m.user.nickname}</span>
-                        {roleIcon[m.role]}
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-sm font-semibold text-gray-900">{m.user.nickname}</span>
+                        <span className={cn('flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0', rc.bg, rc.text)}>
+                          {rc.icon} {rc.label}
+                        </span>
                       </div>
                       {m.user.bio && (
-                        <p className="text-xs text-gray-400 truncate mt-0.5">{m.user.bio}</p>
+                        <p className="text-xs text-gray-400 truncate">{m.user.bio}</p>
                       )}
                     </div>
-                    <span className={cn(
-                      'text-xs px-2 py-0.5 rounded-full shrink-0',
-                      m.role === 'OWNER' ? 'bg-amber-50 text-amber-600'
-                      : m.role === 'ADMIN' ? 'bg-blue-50 text-blue-600'
-                      : 'bg-gray-100 text-gray-500',
-                    )}>
-                      {roleLabel[m.role]}
-                    </span>
                   </button>
 
-                  {/* 강퇴 메뉴 */}
                   {canKick && (
                     <div className="pr-3 relative">
                       <button

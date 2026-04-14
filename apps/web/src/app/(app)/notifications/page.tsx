@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck } from 'lucide-react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { Bell, CheckCheck, Users, CheckSquare, MessageCircle } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
@@ -14,6 +14,17 @@ interface Notification {
   body: string;
   isRead: boolean;
   createdAt: string;
+}
+
+function NotifIcon({ type }: { type: string }) {
+  const base = 'h-9 w-9 rounded-xl flex items-center justify-center shrink-0';
+  if (type?.includes('CREW') || type?.includes('crew'))
+    return <div className={cn(base, 'bg-primary-50')}><Users className="h-4 w-4 text-primary-500" /></div>;
+  if (type?.includes('TODO') || type?.includes('todo'))
+    return <div className={cn(base, 'bg-green-50')}><CheckSquare className="h-4 w-4 text-green-500" /></div>;
+  if (type?.includes('COMMENT') || type?.includes('comment') || type?.includes('REACTION'))
+    return <div className={cn(base, 'bg-amber-50')}><MessageCircle className="h-4 w-4 text-amber-500" /></div>;
+  return <div className={cn(base, 'bg-gray-100')}><Bell className="h-4 w-4 text-gray-400" /></div>;
 }
 
 export default function NotificationsPage() {
@@ -49,12 +60,19 @@ export default function NotificationsPage() {
   };
 
   const hasUnread = notifications.some((n) => !n.isRead);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin">
+    <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-6 pb-20 md:pb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-bold text-gray-900">알림</h1>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">알림</h1>
+            {unreadCount > 0 && (
+              <p className="text-xs text-gray-400 mt-0.5">읽지 않은 알림 {unreadCount}개</p>
+            )}
+          </div>
           {hasUnread && (
             <Button variant="ghost" size="sm" onClick={markAll}>
               <CheckCheck className="h-4 w-4" /> 모두 읽음
@@ -63,31 +81,35 @@ export default function NotificationsPage() {
         </div>
 
         {notifications.length === 0 ? (
-          <div className="py-16 flex flex-col items-center gap-3 text-gray-400">
-            <Bell className="h-10 w-10 text-gray-200" />
-            <p className="text-sm">알림이 없습니다</p>
+          <div className="card py-16 flex flex-col items-center gap-3 text-gray-400">
+            <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+              <Bell className="h-7 w-7 text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-500">알림이 없습니다</p>
+            <p className="text-xs text-gray-400">크루 활동이 생기면 여기서 확인할 수 있어요</p>
           </div>
         ) : (
-          <div className="card divide-y divide-gray-100">
+          <div className="space-y-2">
             {notifications.map((n) => (
               <div
                 key={n.id}
                 onClick={() => !n.isRead && markOne(n.id)}
                 className={cn(
-                  'px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors',
-                  !n.isRead && 'bg-primary-50/50',
+                  'card flex items-start gap-3 px-4 py-3.5 cursor-pointer hover:shadow-md transition-all duration-200',
+                  !n.isRead && 'border-primary-100 bg-primary-50/30',
                 )}
               >
-                <div className="flex items-start gap-3">
-                  <div className={cn('h-2 w-2 rounded-full mt-1.5 shrink-0', n.isRead ? 'bg-gray-200' : 'bg-primary-500')} />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-sm', n.isRead ? 'text-gray-600' : 'text-gray-900 font-medium')}>
-                      {n.title}
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">{n.body}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDate(n.createdAt)}</p>
-                  </div>
+                <NotifIcon type={n.type} />
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-sm leading-snug', n.isRead ? 'text-gray-600' : 'text-gray-900 font-semibold')}>
+                    {n.title}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-0.5 leading-snug">{n.body}</p>
+                  <p className="text-xs text-gray-400 mt-1.5">{formatDate(n.createdAt)}</p>
                 </div>
+                {!n.isRead && (
+                  <div className="h-2 w-2 rounded-full bg-primary-500 mt-1.5 shrink-0" />
+                )}
               </div>
             ))}
           </div>

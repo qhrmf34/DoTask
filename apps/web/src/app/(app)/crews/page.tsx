@@ -129,52 +129,38 @@ function JoinModal({ crew, onClose }: { crew: Crew; onClose: () => void }) {
   );
 }
 
-function CrewCard({ crew, onJoinClick, isMine }: { crew: Crew; onJoinClick: (crew: Crew) => void; isMine: boolean }) {
-  if (isMine) {
-    return (
-      <Link href={`/crews/${crew.id}`} className="card p-4 hover:shadow-card-hover transition-shadow block">
-        <CrewCardContent crew={crew} />
-      </Link>
-    );
-  }
-  return (
-    <button onClick={() => onJoinClick(crew)} className="card p-4 hover:shadow-card-hover transition-shadow block w-full text-left">
-      <CrewCardContent crew={crew} />
-    </button>
-  );
-}
+const cardBase = 'card-hover p-4 block text-left w-full';
 
-function CrewCardContent({ crew }: { crew: Crew }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="h-12 w-12 rounded-xl bg-primary-50 flex items-center justify-center shrink-0 overflow-hidden">
+function CrewCard({ crew, onJoinClick, isMine }: { crew: Crew; onJoinClick: (crew: Crew) => void; isMine: boolean }) {
+  const content = (
+    <div className="flex items-center gap-3.5">
+      <div className="h-13 w-13 h-[52px] w-[52px] rounded-2xl bg-primary-50 flex items-center justify-center shrink-0 overflow-hidden">
         {crew.bannerImage ? (
-          <img src={crew.bannerImage} alt={crew.name} className="w-full h-full object-cover" />
+          <img src={resolveUrl(crew.bannerImage)} alt={crew.name} className="w-full h-full object-cover" />
         ) : (
-          <Users className="h-5 w-5 text-primary-400" />
+          <Users className="h-6 w-6 text-primary-300" />
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-gray-900 truncate">{crew.name}</h3>
-          {crew.visibility === 'PASSWORD' && <Lock className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
-          {crew.visibility === 'PUBLIC' && <Globe className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <h3 className="font-semibold text-gray-900 truncate text-sm">{crew.name}</h3>
+          {crew.visibility === 'PASSWORD' && <Lock className="h-3 w-3 text-gray-400 shrink-0" />}
         </div>
         {crew.description && (
-          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{crew.description}</p>
+          <p className="text-xs text-gray-400 line-clamp-1 mb-1.5">{crew.description}</p>
         )}
-        <div className="flex items-center gap-3 mt-2">
-          <span className="flex items-center gap-1 text-xs text-gray-400">
-            <Users className="h-3.5 w-3.5" />
-            {crew._count.members}/{crew.maxMembers}명
-          </span>
-          <span className="text-xs text-gray-300 px-2 py-0.5 border border-gray-200 rounded-full">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-gray-400">{crew._count.members}/{crew.maxMembers}명</span>
+          <span className="text-[11px] px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">
             {CATEGORY_LABELS[crew.category] ?? crew.category}
           </span>
         </div>
       </div>
     </div>
   );
+
+  if (isMine) return <Link href={`/crews/${crew.id}`} className={cardBase}>{content}</Link>;
+  return <button onClick={() => onJoinClick(crew)} className={cardBase}>{content}</button>;
 }
 
 export default function CrewsPage() {

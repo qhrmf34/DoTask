@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import { TodoList } from '@/components/todos/TodoList';
@@ -34,91 +34,86 @@ export default function TodosPage() {
 
   const done = filteredTodos.filter((t: any) => t.isCompleted).length;
   const total = filteredTodos.length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin">
-      <div className="max-w-5xl mx-auto px-4 md:px-6 py-6 pb-20 md:pb-6">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 py-5 pb-20 md:pb-6">
+
         {/* Header */}
-        <div className="mb-5">
-          <p className="text-sm text-gray-400">
+        <div className="mb-6">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
             {format(new Date(), 'yyyy년 M월 d일 EEEE', { locale: ko })}
           </p>
-          <h1 className="text-2xl font-bold text-gray-900 mt-0.5">
-            안녕하세요, {user?.nickname}님
+          <h1 className="text-2xl font-bold text-gray-900 mt-1">
+            {user?.nickname}님의 할일
           </h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main: date nav + category filter + todo list */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Main */}
           <div className="lg:col-span-2 space-y-4">
-            {/* Date navigator */}
-            <div className="card px-4 py-3 flex items-center justify-between">
-              <button
-                onClick={() => setSelectedDate((d) => subDays(d, 1))}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
 
-              <div className="text-center">
-                <p className="text-sm font-semibold text-gray-900">
-                  {format(selectedDate, 'M월 d일 EEEE', { locale: ko })}
-                </p>
-                {isToday(selectedDate) && (
-                  <span className="text-xs text-primary-500 font-medium">오늘</span>
-                )}
-                {total > 0 && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {done}/{total} 완료
-                  </p>
-                )}
+            {/* Date navigator + progress */}
+            <div className="card px-5 py-4">
+              <div className="flex items-center gap-4">
+                <button onClick={() => setSelectedDate((d) => subDays(d, 1))}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors shrink-0">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {format(selectedDate, 'M월 d일 EEEE', { locale: ko })}
+                      </p>
+                      {isToday(selectedDate) && (
+                        <span className="text-xs text-primary-500 font-medium">오늘</span>
+                      )}
+                    </div>
+                    {total > 0 && (
+                      <span className={cn('text-sm font-bold tabular-nums', pct === 100 ? 'text-green-500' : 'text-primary-500')}>
+                        {done}/{total}
+                      </span>
+                    )}
+                  </div>
+                  {total > 0 && (
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={cn('h-full rounded-full transition-all duration-500', pct === 100 ? 'bg-green-400' : 'bg-primary-400')}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                </div>
+
+                <button onClick={() => setSelectedDate((d) => addDays(d, 1))}
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors shrink-0">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
 
-              <button
-                onClick={() => setSelectedDate((d) => addDays(d, 1))}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              {!isToday(selectedDate) && (
+                <button onClick={() => setSelectedDate(new Date())}
+                  className="mt-3 w-full py-1.5 text-xs text-primary-500 font-medium border border-primary-100 rounded-lg hover:bg-primary-50 transition-colors">
+                  오늘로 돌아가기
+                </button>
+              )}
             </div>
-
-            {/* Today shortcut */}
-            {!isToday(selectedDate) && (
-              <button
-                onClick={() => setSelectedDate(new Date())}
-                className="flex items-center gap-1.5 text-xs text-primary-500 hover:underline"
-              >
-                <CalendarDays className="h-3.5 w-3.5" />
-                오늘로 돌아가기
-              </button>
-            )}
 
             {/* Category filter */}
             {categories.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setCategoryFilter(null)}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium border transition-all',
-                    !categoryFilter
-                      ? 'bg-primary-500 text-white border-primary-500'
-                      : 'border-gray-200 text-gray-500 hover:border-gray-300',
-                  )}
-                >
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button onClick={() => setCategoryFilter(null)}
+                  className={cn('px-3 py-1.5 rounded-xl text-xs font-medium transition-all',
+                    !categoryFilter ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300')}>
                   전체
                 </button>
                 {categories.map((cat: any) => (
-                  <button
-                    key={cat.id}
+                  <button key={cat.id}
                     onClick={() => setCategoryFilter(cat.id === categoryFilter ? null : cat.id)}
-                    className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium border transition-all',
-                      categoryFilter === cat.id
-                        ? 'text-white border-transparent'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300',
-                    )}
-                    style={categoryFilter === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}
-                  >
+                    className={cn('px-3 py-1.5 rounded-xl text-xs font-medium transition-all border',
+                      categoryFilter === cat.id ? 'text-white border-transparent' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300')}
+                    style={categoryFilter === cat.id ? { backgroundColor: cat.color, borderColor: cat.color } : {}}>
                     {cat.name}
                   </button>
                 ))}

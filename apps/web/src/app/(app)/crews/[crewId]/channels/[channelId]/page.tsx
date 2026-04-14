@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn, formatTime, formatFileSize } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
+import { useDialog } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
@@ -30,6 +31,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
   const { channelId } = params;
   const user = useAuthStore((s) => s.user);
 
+  const { confirm } = useDialog();
   const [input, setInput] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -145,6 +147,8 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
   };
 
   const handleDelete = async (id: string) => {
+    const ok = await confirm({ title: '메시지 삭제', message: '이 메시지를 삭제할까요?', confirmText: '삭제', cancelText: '취소', type: 'danger' });
+    if (!ok) return;
     await api.delete(`/messages/${id}`);
     setMenuOpen(null);
   };
@@ -152,7 +156,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
   const handleReport = async (id: string) => {
     await api.post(`/messages/${id}/report`, { reason: 'INAPPROPRIATE' });
     setMenuOpen(null);
-    alert('신고가 접수되었습니다.');
+    await confirm({ title: '신고 완료', message: '신고가 접수되었습니다.', confirmText: '확인', type: 'alert' });
   };
 
   return (
@@ -296,17 +300,17 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
       )}
 
       {/* Input */}
-      <div className="border-t border-gray-100 p-3">
-        <div className="flex items-end gap-2">
+      <div className="border-t border-gray-100 px-4 py-3 bg-white">
+        <div className="flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl px-3 py-2 focus-within:border-primary-300 focus-within:ring-2 focus-within:ring-primary-100 transition-all">
           <input type="file" ref={fileRef} className="hidden" onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
           <button
             onClick={() => fileRef.current?.click()}
-            className="h-9 w-9 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+            className="h-8 w-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors shrink-0 mb-0.5"
           >
             <Paperclip className="h-4 w-4" />
           </button>
           <textarea
-            className="flex-1 input-field resize-none min-h-[38px] max-h-32 py-2"
+            className="flex-1 bg-transparent text-sm resize-none min-h-[32px] max-h-32 py-1 outline-none placeholder:text-gray-400 text-gray-800"
             placeholder="메시지 입력..."
             rows={1}
             value={input}
@@ -322,8 +326,8 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
             onClick={sendMessage}
             disabled={!input.trim() && !uploadFile}
             className={cn(
-              'h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-colors',
-              (input.trim() || uploadFile) ? 'bg-primary-500 text-white hover:bg-primary-600' : 'bg-gray-100 text-gray-400',
+              'h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-all mb-0.5',
+              (input.trim() || uploadFile) ? 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm' : 'text-gray-300',
             )}
           >
             <Send className="h-4 w-4" />
