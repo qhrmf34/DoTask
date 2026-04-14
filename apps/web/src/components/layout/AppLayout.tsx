@@ -20,7 +20,12 @@ function NavItem({ href, icon: Icon, label }: { href: string; icon: React.Elemen
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(href + '/');
   return (
-    <Link href={href} className={cn('sidebar-item', active && 'active')}>
+    <Link href={href} className={cn(
+      'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer',
+      active
+        ? 'bg-primary-500 text-white shadow-sm shadow-primary-200'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800',
+    )}>
       <Icon className="h-[18px] w-[18px] shrink-0" />
       <span className="hidden lg:block">{label}</span>
     </Link>
@@ -28,13 +33,8 @@ function NavItem({ href, icon: Icon, label }: { href: string; icon: React.Elemen
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const pathname = usePathname();
-
-  const handleLogout = async () => {
-    await api.post('/auth/logout').catch(() => {});
-    logout();
-  };
 
   return (
     <div className="flex h-[100dvh] bg-gray-50 overflow-hidden">
@@ -42,7 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden md:flex flex-col w-16 lg:w-56 border-r border-gray-100 bg-white shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-2.5 h-16 px-4 border-b border-gray-100">
-          <div className="h-8 w-8 rounded-xl bg-primary-500 flex items-center justify-center shrink-0">
+          <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shrink-0 shadow-sm shadow-primary-200">
             <CheckSquare className="h-4 w-4 text-white" />
           </div>
           <span className="hidden lg:block text-base font-bold text-gray-900">DoTask</span>
@@ -59,7 +59,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link href="/settings" className="flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-gray-50 transition-colors group">
             <Avatar src={user?.profileImage} fallback={user?.nickname} size="sm" />
             <div className="hidden lg:block flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate leading-tight">{user?.nickname}</p>
+              <p className="text-sm font-bold text-gray-900 truncate leading-tight">{user?.nickname}</p>
               <p className="text-xs text-gray-400 truncate">{user?.email}</p>
             </div>
           </Link>
@@ -77,9 +77,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           const active = pathname === href || pathname.startsWith(href + '/');
           return (
             <Link key={href} href={href}
-              className={cn('flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-[11px] font-medium transition-colors',
-                active ? 'text-primary-600' : 'text-gray-400')}>
-              <Icon className={cn('h-5 w-5', active && 'stroke-[2.5px]')} />
+              className={cn(
+                'flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-[11px] font-semibold transition-colors',
+                active ? 'text-primary-600' : 'text-gray-400',
+              )}>
+              <div className={cn('p-1 rounded-xl transition-all', active && 'bg-primary-50')}>
+                <Icon className={cn('h-5 w-5', active && 'stroke-[2.5px]')} />
+              </div>
               <span>{label}</span>
             </Link>
           );

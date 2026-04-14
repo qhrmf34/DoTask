@@ -23,6 +23,7 @@ export default function LoginPage() {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
+  const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
 
@@ -37,6 +38,7 @@ export default function LoginPage() {
     try {
       const res = await api.post('/auth/login', data);
       setAccessToken(res.data.accessToken);
+      if (res.data.refreshToken) setRefreshToken(res.data.refreshToken);
       const me = await api.get('/users/me');
       setUser(me.data);
       router.push('/todos');

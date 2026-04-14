@@ -17,6 +17,20 @@ export class TodosController {
     return this.todosService.findByDate(userId, date || new Date().toISOString().split('T')[0]);
   }
 
+  @Get('monthly-stats')
+  getMonthlyStats(
+    @CurrentUser('sub') userId: string,
+    @Query('year') year: string,
+    @Query('month') month: string,
+  ) {
+    const now = new Date();
+    return this.todosService.getMonthlyStats(
+      userId,
+      parseInt(year) || now.getFullYear(),
+      parseInt(month) || now.getMonth() + 1,
+    );
+  }
+
   @Post()
   create(@CurrentUser('sub') userId: string, @Body() dto: CreateTodoDto) {
     return this.todosService.create(userId, dto);

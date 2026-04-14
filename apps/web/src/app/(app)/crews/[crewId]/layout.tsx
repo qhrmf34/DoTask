@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Hash, ArrowLeft, ChevronDown, ChevronRight, Play, Pause, Square, RotateCcw } from 'lucide-react';
 import { cn, formatSeconds, resolveUrl } from '@/lib/utils';
 import { useDialog } from '@/components/ui/dialog';
@@ -12,7 +12,8 @@ import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
 
-interface Channel { id: string; name: string; type: string }
+interface LastMessage { content: string; type: string; createdAt: string; user: { nickname: string } }
+interface Channel { id: string; name: string; type: string; lastMessage?: LastMessage | null }
 interface Crew { id: string; name: string; emoji: string; bannerImage?: string; description?: string }
 interface MemberStat { userId: string; nickname: string; profileImage?: string; role: string; done: number; total: number; pct: number }
 interface PomoState { sessionId: string; startedById: string; workMinutes: number; breakMinutes: number; status: 'RUNNING' | 'PAUSED' | 'BREAK'; endsAt: number; remainingMs?: number }
@@ -170,6 +171,8 @@ export default function CrewLayout({
 }) {
   const { crewId } = params;
   const pathname = usePathname();
+  const qc = useQueryClient();
+  const accessToken = useAuthStore((s) => s.accessToken);
   const [channelsOpen, setChannelsOpen] = useState(true);
   const [membersOpen, setMembersOpen] = useState(true);
 
@@ -182,6 +185,27 @@ export default function CrewLayout({
     queryKey: ['channels', crewId],
     queryFn: () => api.get(`/crews/${crewId}/channels`).then((r) => r.data),
   });
+
+  // 새 메시지가 오면 해당 채널의 lastMessage 실시간 업데이트
+  useEffect(() => {
+    if (!accessToken) return;
+    const socket = getSocket(accessToken);
+
+    const handleNewMsg = (msg: any) => {
+      if (!msg?.channelId) return;
+      qc.setQueryData(['channels', crewId], (old: Channel[] | undefined) => {
+        if (!old) return old;
+        return old.map((ch) =>
+          ch.id === msg.channelId
+            ? { ...ch, lastMessage: { content: msg.content, type: msg.type, createdAt: msg.createdAt, user: msg.user } }
+            : ch,
+        );
+      });
+    };
+
+    socket.on('chat:message', handleNewMsg);
+    return () => { socket.off('chat:message', handleNewMsg); };
+  }, [crewId, accessToken, qc]);
 
   const { data: stats = [] } = useQuery<MemberStat[]>({
     queryKey: ['crew-today-stats', crewId],
@@ -233,17 +257,36 @@ export default function CrewLayout({
             <span>채널</span>
             {channelsOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
           </button>
-          {channelsOpen && channels.map((ch) => (
-            <Link key={ch.id} href={`/crews/${crewId}/channels/${ch.id}`}
-              className={cn(
-                'flex items-center gap-2 px-2.5 py-2 rounded-xl text-sm transition-colors',
-                pathname.includes(ch.id) ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700',
-              )}
-            >
-              <Hash className="h-3.5 w-3.5 shrink-0 opacity-60" />
-              <span className="truncate">{ch.name}</span>
-            </Link>
-          ))}
+          {channelsOpen && channels.map((ch) => {
+            const active = pathname.includes(ch.id);
+            const last = ch.lastMessage;
+            const preview = last
+              ? last.type === 'IMAGE' ? '📷 사진'
+              : last.type === 'FILE' ? '📎 파일'
+              : last.content.slice(0, 26)
+              : null;
+
+            return (
+              <Link key={ch.id} href={`/crews/${crewId}/channels/${ch.id}`}
+                className={cn(
+                  'flex items-start gap-2 px-2.5 py-2 rounded-xl transition-colors',
+                  active ? 'bg-primary-50' : 'hover:bg-gray-50',
+                )}
+              >
+                <Hash className={cn('h-3.5 w-3.5 shrink-0 mt-0.5 opacity-60', active && 'text-primary-500')} />
+                <div className="min-w-0 flex-1">
+                  <p className={cn('text-sm truncate leading-snug', active ? 'text-primary-700 font-semibold' : 'text-gray-600 font-medium')}>
+                    {ch.name}
+                  </p>
+                  {preview && (
+                    <p className="text-[11px] text-gray-400 truncate mt-0.5 leading-snug">
+                      <span className="font-semibold text-gray-500">{last!.user.nickname}</span>: {preview}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
 
           {/* Member progress */}
           {stats.length > 0 && (
@@ -320,6 +363,12 @@ export default function CrewLayout({
           <div className="hidden lg:flex flex-col w-64 border-l border-gray-100 bg-white shrink-0 overflow-y-auto scrollbar-thin">
             <CrewPomoPanel crewId={crewId} />
 
+            {/* Recent chat */}
+            <div className="p-3 border-b border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5 px-1">최근 채팅</p>
+              <RecentChatPanel channels={channels} crewId={crewId} />
+            </div>
+
             {/* Latest post activity */}
             <div className="p-3">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2.5 px-1">게시판 활동</p>
@@ -328,6 +377,43 @@ export default function CrewLayout({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function RecentChatPanel({ channels, crewId }: { channels: Channel[]; crewId: string }) {
+  // lastMessage가 있는 채널만, createdAt 내림차순으로 최대 4개
+  const recent = [...channels]
+    .filter((ch) => ch.lastMessage)
+    .sort((a, b) => new Date(b.lastMessage!.createdAt).getTime() - new Date(a.lastMessage!.createdAt).getTime())
+    .slice(0, 4);
+
+  if (!recent.length) return <p className="text-xs text-gray-400 px-1">아직 대화가 없습니다.</p>;
+
+  return (
+    <div className="space-y-1.5">
+      {recent.map((ch) => {
+        const last = ch.lastMessage!;
+        const preview = last.type === 'IMAGE' ? '사진을 보냈습니다'
+          : last.type === 'FILE' ? '파일을 보냈습니다'
+          : last.content;
+        return (
+          <Link key={ch.id} href={`/crews/${crewId}/channels/${ch.id}`}
+            className="flex items-start gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors"
+          >
+            <div className="h-6 w-6 rounded-lg bg-primary-50 flex items-center justify-center shrink-0 mt-0.5">
+              <Hash className="h-3 w-3 text-primary-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-gray-600 truncate">{last.user.nickname}</span>
+                <span className="text-[10px] text-gray-300 shrink-0">#{ch.name}</span>
+              </div>
+              <p className="text-[11px] text-gray-400 truncate mt-0.5">{preview}</p>
+            </div>
+          </Link>
+        );
+      })}
     </div>
   );
 }

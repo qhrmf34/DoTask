@@ -5,11 +5,30 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ChannelsService {
   constructor(private prisma: PrismaService) {}
 
-  getByCrewId(crewId: string) {
-    return this.prisma.channel.findMany({
+  async getByCrewId(crewId: string) {
+    const channels = await this.prisma.channel.findMany({
       where: { crewId },
       orderBy: { order: 'asc' },
     });
+
+    // 각 채널의 마지막 메시지 병렬 조회
+    const withLastMsg = await Promise.all(
+      channels.map(async (ch) => {
+        const last = await this.prisma.message.findFirst({
+          where: { channelId: ch.id, isDeleted: false },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            content: true,
+            type: true,
+            createdAt: true,
+            user: { select: { nickname: true } },
+          },
+        });
+        return { ...ch, lastMessage: last ?? null };
+      }),
+    );
+
+    return withLastMsg;
   }
 
   async create(userId: string, crewId: string, data: { name: string; type?: string; order?: number }) {

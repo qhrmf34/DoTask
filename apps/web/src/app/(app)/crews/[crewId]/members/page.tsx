@@ -27,6 +27,116 @@ interface Todo {
   reactions: TodoReaction[];
 }
 
+function TodoRow({
+  todo, meId, expandedTodo, commentText, comments, loadingComments, onReact, onToggleComments, onComment, onCommentChange,
+}: {
+  todo: Todo;
+  meId?: string;
+  expandedTodo: string | null;
+  commentText: Record<string, string>;
+  comments: Record<string, any[]>;
+  loadingComments: string | null;
+  onReact: (id: string, type: 'LIKE' | 'DISLIKE') => void;
+  onToggleComments: (id: string) => void;
+  onComment: (id: string) => void;
+  onCommentChange: (id: string, value: string) => void;
+}) {
+  const myLike = todo.reactions.find((r) => r.userId === meId && r.type === 'LIKE');
+  const myDislike = todo.reactions.find((r) => r.userId === meId && r.type === 'DISLIKE');
+  const likes = todo.reactions.filter((r) => r.type === 'LIKE').length;
+  const dislikes = todo.reactions.filter((r) => r.type === 'DISLIKE').length;
+  const isExpanded = expandedTodo === todo.id;
+
+  return (
+    <div className={cn('rounded-xl border border-gray-100 bg-white p-3 space-y-2', todo.isCompleted && 'opacity-55')}>
+      <div className="flex items-start gap-2.5">
+        <div className={cn(
+          'mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all',
+          todo.isCompleted ? 'bg-primary-500 border-primary-500' : 'border-gray-300',
+        )}>
+          {todo.isCompleted && <span className="text-white text-[8px] font-bold">✓</span>}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-sm text-gray-800 leading-snug', todo.isCompleted && 'line-through text-gray-400')}>
+            {todo.title}
+          </p>
+          {todo.category && (
+            <span className="inline-block text-[11px] px-1.5 py-0.5 rounded-full mt-1 font-medium"
+              style={{ backgroundColor: todo.category.color + '18', color: todo.category.color }}>
+              {todo.category.name}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1 pl-6">
+        <button
+          onClick={() => onReact(todo.id, 'LIKE')}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+            myLike ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-400 hover:bg-gray-50',
+          )}
+        >
+          <ThumbsUp className="h-3 w-3" /> {likes}
+        </button>
+        <button
+          onClick={() => onReact(todo.id, 'DISLIKE')}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+            myDislike ? 'bg-red-50 text-red-500 font-medium' : 'text-gray-400 hover:bg-gray-50',
+          )}
+        >
+          <ThumbsDown className="h-3 w-3" /> {dislikes}
+        </button>
+        <button
+          onClick={() => onToggleComments(todo.id)}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+            isExpanded ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:bg-gray-50',
+          )}
+        >
+          <MessageCircle className="h-3 w-3" />
+          {todo._count.comments > 0 ? todo._count.comments : ''} 댓글
+        </button>
+      </div>
+      {isExpanded && (
+        <div className="pl-6 space-y-2 pt-1.5 border-t border-gray-50">
+          {loadingComments === todo.id ? (
+            <p className="text-xs text-gray-400">불러오는 중...</p>
+          ) : (comments[todo.id] ?? []).length === 0 ? (
+            <p className="text-xs text-gray-400">댓글이 없습니다.</p>
+          ) : (
+            (comments[todo.id] ?? []).map((c: any) => (
+              <div key={c.id} className="flex items-start gap-1.5">
+                <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
+                <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
+                  <p className="text-xs text-gray-600 mt-0.5">{c.content}</p>
+                </div>
+              </div>
+            ))
+          )}
+          <div className="flex gap-1.5">
+            <input
+              className="input-field flex-1 text-xs py-1.5"
+              placeholder="댓글..."
+              value={commentText[todo.id] ?? ''}
+              onChange={(e) => onCommentChange(todo.id, e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onComment(todo.id)}
+            />
+            <button
+              onClick={() => onComment(todo.id)}
+              disabled={!commentText[todo.id]?.trim()}
+              className="px-2.5 py-1.5 bg-primary-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40"
+            >
+              전송
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const roleConfig: Record<string, { icon: React.ReactNode; label: string; bg: string; text: string }> = {
   OWNER: { icon: <Crown className="h-3 w-3" />, label: '오너', bg: 'bg-amber-50', text: 'text-amber-600' },
   ADMIN: { icon: <Shield className="h-3 w-3" />, label: '관리자', bg: 'bg-blue-50', text: 'text-blue-600' },
@@ -102,103 +212,6 @@ function MemberTodosPanel({
 
   const rc = roleConfig[member.role] ?? roleConfig.MEMBER;
 
-  const TodoRow = ({ todo }: { todo: Todo }) => {
-    const myLike = todo.reactions.find((r) => r.userId === me?.id && r.type === 'LIKE');
-    const myDislike = todo.reactions.find((r) => r.userId === me?.id && r.type === 'DISLIKE');
-    const likes = todo.reactions.filter((r) => r.type === 'LIKE').length;
-    const dislikes = todo.reactions.filter((r) => r.type === 'DISLIKE').length;
-    const isExpanded = expandedTodo === todo.id;
-
-    return (
-      <div className={cn('rounded-xl border border-gray-100 bg-white p-3 space-y-2', todo.isCompleted && 'opacity-55')}>
-        <div className="flex items-start gap-2.5">
-          <div className={cn(
-            'mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all',
-            todo.isCompleted ? 'bg-primary-500 border-primary-500' : 'border-gray-300',
-          )}>
-            {todo.isCompleted && <span className="text-white text-[8px] font-bold">✓</span>}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={cn('text-sm text-gray-800 leading-snug', todo.isCompleted && 'line-through text-gray-400')}>
-              {todo.title}
-            </p>
-            {todo.category && (
-              <span className="inline-block text-[11px] px-1.5 py-0.5 rounded-full mt-1 font-medium"
-                style={{ backgroundColor: todo.category.color + '18', color: todo.category.color }}>
-                {todo.category.name}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-1 pl-6">
-          <button
-            onClick={() => handleReact(todo.id, 'LIKE')}
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
-              myLike ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-400 hover:bg-gray-50',
-            )}
-          >
-            <ThumbsUp className="h-3 w-3" /> {likes}
-          </button>
-          <button
-            onClick={() => handleReact(todo.id, 'DISLIKE')}
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
-              myDislike ? 'bg-red-50 text-red-500 font-medium' : 'text-gray-400 hover:bg-gray-50',
-            )}
-          >
-            <ThumbsDown className="h-3 w-3" /> {dislikes}
-          </button>
-          <button
-            onClick={() => toggleComments(todo.id)}
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
-              isExpanded ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:bg-gray-50',
-            )}
-          >
-            <MessageCircle className="h-3 w-3" />
-            {todo._count.comments > 0 ? todo._count.comments : ''} 댓글
-          </button>
-        </div>
-        {isExpanded && (
-          <div className="pl-6 space-y-2 pt-1.5 border-t border-gray-50">
-            {loadingComments === todo.id ? (
-              <p className="text-xs text-gray-400">불러오는 중...</p>
-            ) : (comments[todo.id] ?? []).length === 0 ? (
-              <p className="text-xs text-gray-400">댓글이 없습니다.</p>
-            ) : (
-              (comments[todo.id] ?? []).map((c: any) => (
-                <div key={c.id} className="flex items-start gap-1.5">
-                  <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
-                  <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                    <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
-                    <p className="text-xs text-gray-600 mt-0.5">{c.content}</p>
-                  </div>
-                </div>
-              ))
-            )}
-            <div className="flex gap-1.5">
-              <input
-                className="input-field flex-1 text-xs py-1.5"
-                placeholder="댓글..."
-                value={commentText[todo.id] ?? ''}
-                onChange={(e) => setCommentText((prev) => ({ ...prev, [todo.id]: e.target.value }))}
-                onKeyDown={(e) => e.key === 'Enter' && handleComment(todo.id)}
-              />
-              <button
-                onClick={() => handleComment(todo.id)}
-                disabled={!commentText[todo.id]?.trim()}
-                className="px-2.5 py-1.5 bg-primary-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40"
-              >
-                전송
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="flex flex-col h-full bg-white border-l border-gray-100 w-80 shrink-0">
       {/* Panel header */}
@@ -257,11 +270,39 @@ function MemberTodosPanel({
           </div>
         ) : (
           <>
-            {pending.map((todo) => <TodoRow key={todo.id} todo={todo} />)}
+            {pending.map((todo) => (
+              <TodoRow
+                key={todo.id}
+                todo={todo}
+                meId={me?.id}
+                expandedTodo={expandedTodo}
+                commentText={commentText}
+                comments={comments}
+                loadingComments={loadingComments}
+                onReact={handleReact}
+                onToggleComments={toggleComments}
+                onComment={handleComment}
+                onCommentChange={(id, val) => setCommentText((prev) => ({ ...prev, [id]: val }))}
+              />
+            ))}
             {completed.length > 0 && (
               <div className="pt-1">
                 <p className="text-xs text-gray-400 px-1 mb-2">완료 {completed.length}개</p>
-                {completed.map((todo) => <TodoRow key={todo.id} todo={todo} />)}
+                {completed.map((todo) => (
+                  <TodoRow
+                    key={todo.id}
+                    todo={todo}
+                    meId={me?.id}
+                    expandedTodo={expandedTodo}
+                    commentText={commentText}
+                    comments={comments}
+                    loadingComments={loadingComments}
+                    onReact={handleReact}
+                    onToggleComments={toggleComments}
+                    onComment={handleComment}
+                    onCommentChange={(id, val) => setCommentText((prev) => ({ ...prev, [id]: val }))}
+                  />
+                ))}
               </div>
             )}
           </>

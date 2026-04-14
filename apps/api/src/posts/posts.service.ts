@@ -12,6 +12,7 @@ const POST_SELECT = {
   updatedAt: true,
   user: { select: { id: true, nickname: true, profileImage: true } },
   _count: { select: { comments: true, reactions: true } },
+  reactions: { select: { type: true, userId: true } },
 };
 
 @Injectable()

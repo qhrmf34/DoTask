@@ -5,13 +5,12 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Send, Paperclip, X, File, Image as ImageIcon, MoreHorizontal, Pencil, Trash2, Flag,
 } from 'lucide-react';
-import { cn, formatTime, formatFileSize } from '@/lib/utils';
+import { cn, formatTime, formatFileSize, resolveUrl } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';
-import Image from 'next/image';
 
 interface Message {
   id: string;
@@ -39,6 +38,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const lastMsgIdRef = useRef<string | null>(null);
   const qc = useQueryClient();
 
   // ── Messages query ──────────────────────────────────────────
@@ -46,14 +46,16 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
     queryKey: ['messages', channelId],
     queryFn: ({ pageParam }) =>
       api.get(`/channels/${channelId}/messages${pageParam ? `?cursor=${pageParam}` : ''}`).then((r) => r.data),
-    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    getNextPageParam: (page) => page?.nextCursor ?? undefined,
     initialPageParam: undefined as string | undefined,
   });
 
-  const messages: Message[] = (data?.pages ?? [])
-    .flatMap((p) => p?.items ?? [])
-    .filter((m): m is Message => m != null)
-    .reverse();
+  // pages[0] = 가장 최근 메시지 (ASC), pages[1] = 더 오래된 메시지 (ASC)
+  // 화면 표시는 오래된 것부터: 페이지 역순으로 flatMap
+  const messages: Message[] = [...(data?.pages ?? [])]
+    .reverse()
+    .flatMap((p) => p?.data ?? p?.items ?? [])
+    .filter((m): m is Message => m != null);
 
   // ── Socket ──────────────────────────────────────────────────
   useEffect(() => {
@@ -65,7 +67,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
       qc.setQueryData(['messages', channelId], (old: any) => {
         if (!old?.pages?.length) return old;
         const pages = [...old.pages];
-        pages[0] = { ...pages[0], items: [msg, ...(pages[0]?.items ?? [])] };
+        pages[0] = { ...pages[0], data: [...(pages[0]?.data ?? pages[0]?.items ?? []), msg] };
         return { ...old, pages };
       });
     });
@@ -78,7 +80,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
           ...old,
           pages: old.pages.map((p: any) => ({
             ...p,
-            items: (p.items ?? []).map((m: Message) => m?.id === msg.id ? msg : m),
+            data: (p.data ?? p.items ?? []).map((m: Message) => m?.id === msg.id ? msg : m),
           })),
         };
       });
@@ -91,7 +93,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
           ...old,
           pages: old.pages.map((p: any) => ({
             ...p,
-            items: (p.items ?? []).map((m: Message) =>
+            data: (p.data ?? p.items ?? []).map((m: Message) =>
               m?.id === id ? { ...m, isDeleted: true, content: '삭제된 메시지입니다.' } : m,
             ),
           })),
@@ -107,9 +109,15 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
     };
   }, [channelId, qc]);
 
+  // 새 메시지가 추가됐을 때만 스크롤 (이전 메시지 로드 시에는 스크롤 안 함)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg) return;
+    if (lastMsg.id !== lastMsgIdRef.current) {
+      lastMsgIdRef.current = lastMsg.id;
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
 
   // ── Send ────────────────────────────────────────────────────
   const sendMessage = async () => {
@@ -160,7 +168,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-gray-50">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-4 space-y-1">
         {hasNextPage && (
@@ -173,7 +181,11 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
           if (!msg) return null;
           const isMine = msg.user?.id === user?.id;
           const prevMsg = messages[i - 1];
-          const showAvatar = i === 0 || prevMsg?.user?.id !== msg.user?.id;
+          const showAvatar = i === 0 || prevMsg?.user?.id !== msg.user?.id || (() => {
+            const msgDate = new Date(msg.createdAt).toDateString();
+            const prevDate = prevMsg ? new Date(prevMsg.createdAt).toDateString() : null;
+            return msgDate !== prevDate;
+          })();
 
           const msgDate = new Date(msg.createdAt).toDateString();
           const prevDate = prevMsg ? new Date(prevMsg.createdAt).toDateString() : null;
@@ -185,31 +197,34 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
           return (
             <React.Fragment key={msg.id}>
             {showDateSep && (
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex-1 h-px bg-gray-100" />
-                <span className="text-[11px] text-gray-400 font-medium shrink-0">{dateLabel}</span>
-                <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex items-center gap-3 py-3">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-[11px] text-gray-400 font-semibold bg-gray-100 px-3 py-1 rounded-full shrink-0">{dateLabel}</span>
+                <div className="flex-1 h-px bg-gray-200" />
               </div>
             )}
-            <div className={cn('group flex gap-3 px-2 py-0.5 rounded-lg hover:bg-gray-50', isMine && 'flex-row-reverse')}>
-              <div className="w-8 shrink-0">
-                {showAvatar && (
+
+            {/* Message row */}
+            <div className={cn('group flex items-end gap-2 px-1', isMine ? 'flex-row-reverse' : 'flex-row', showAvatar ? 'mt-2' : 'mt-0.5')}>
+              {/* Avatar */}
+              <div className="w-8 shrink-0 self-end">
+                {!isMine && showAvatar && (
                   <Avatar src={msg.user?.profileImage} fallback={msg.user?.nickname ?? '?'} size="sm" />
                 )}
               </div>
 
-              <div className={cn('flex flex-col max-w-[70%]', isMine && 'items-end')}>
-                {showAvatar && (
-                  <span className={cn('text-xs text-gray-400 mb-0.5', isMine && 'text-right')}>
+              <div className={cn('flex flex-col max-w-[68%]', isMine ? 'items-end' : 'items-start')}>
+                {!isMine && showAvatar && (
+                  <span className="text-[11px] text-gray-500 font-semibold mb-1 ml-1">
                     {msg.user?.nickname ?? '알 수 없음'}
                   </span>
                 )}
 
                 {editingId === msg.id ? (
-                  <div className="flex gap-2 items-end">
+                  <div className="flex gap-2 items-end w-full">
                     <input
                       autoFocus
-                      className="input-field text-sm"
+                      className="input-field text-sm flex-1"
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
                       onKeyDown={(e) => {
@@ -217,63 +232,66 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                         if (e.key === 'Escape') setEditingId(null);
                       }}
                     />
-                    <button onClick={() => handleEdit(msg.id)} className="text-xs text-primary-600 shrink-0">저장</button>
+                    <button onClick={() => handleEdit(msg.id)} className="text-xs text-primary-600 shrink-0 font-medium">저장</button>
                     <button onClick={() => setEditingId(null)} className="text-xs text-gray-400 shrink-0">취소</button>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <div className={cn(
-                      'rounded-2xl px-3 py-2 text-sm break-words',
-                      isMine ? 'bg-primary-500 text-white rounded-tr-sm' : 'bg-gray-100 text-gray-800 rounded-tl-sm',
-                      msg.isDeleted && 'opacity-60 italic',
-                    )}>
-                      {msg.type === 'IMAGE' && msg.fileUrl ? (
-                        <Image src={msg.fileUrl} alt={msg.fileName ?? ''} width={240} height={180} className="rounded-lg object-cover max-w-[240px]" />
-                      ) : msg.type === 'FILE' && msg.fileUrl ? (
-                        <a href={msg.fileUrl} download={msg.fileName}
-                          className={cn('flex items-center gap-2', isMine ? 'text-white' : 'text-primary-600')}>
-                          <File className="h-4 w-4 shrink-0" />
-                          <span className="text-xs underline truncate max-w-[160px]">{msg.fileName}</span>
-                          {msg.fileSize && <span className="text-xs opacity-70 shrink-0">{formatFileSize(msg.fileSize)}</span>}
-                        </a>
-                      ) : (
-                        <span>{msg.content}</span>
-                      )}
-                    </div>
-                    <div className={cn('flex items-center gap-1 mt-0.5', isMine ? 'justify-end' : '')}>
-                      <span className="text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>
-                      {msg.isEdited && <span className="text-[10px] text-gray-400">(수정됨)</span>}
-                    </div>
+                  <div className={cn(
+                    'relative px-3.5 py-2.5 text-sm break-words leading-relaxed shadow-sm',
+                    isMine
+                      ? 'bg-primary-500 text-white rounded-2xl rounded-br-sm shadow-primary-100'
+                      : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100',
+                    msg.isDeleted && 'opacity-50 italic',
+                  )}>
+                    {msg.type === 'IMAGE' && msg.fileUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={resolveUrl(msg.fileUrl)} alt={msg.fileName ?? ''} className="rounded-xl object-cover max-w-[240px] max-h-[180px]" />
+                    ) : msg.type === 'FILE' && msg.fileUrl ? (
+                      <a href={msg.fileUrl} download={msg.fileName}
+                        className={cn('flex items-center gap-2', isMine ? 'text-white' : 'text-primary-600')}>
+                        <File className="h-4 w-4 shrink-0" />
+                        <span className="text-xs underline truncate max-w-[160px]">{msg.fileName}</span>
+                        {msg.fileSize && <span className="text-xs opacity-70 shrink-0">{formatFileSize(msg.fileSize)}</span>}
+                      </a>
+                    ) : (
+                      <span>{msg.content}</span>
+                    )}
                   </div>
                 )}
+
+                <div className={cn('flex items-center gap-1 mt-0.5 px-1', isMine ? 'flex-row-reverse' : '')}>
+                  <span className="text-[10px] text-gray-400">{formatTime(msg.createdAt)}</span>
+                  {msg.isEdited && <span className="text-[10px] text-gray-400">· 수정됨</span>}
+                </div>
               </div>
 
+              {/* Action menu */}
               {!msg.isDeleted && (
-                <div className={cn('flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0', isMine && 'order-first')}>
+                <div className={cn('flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0 self-center', isMine && 'order-first')}>
                   <div className="relative">
                     <button
                       onClick={() => setMenuOpen(menuOpen === msg.id ? null : msg.id)}
-                      className="h-6 w-6 rounded flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
+                      className="h-7 w-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-white shadow-sm transition-colors"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
                     {menuOpen === msg.id && (
-                      <div className={cn('absolute top-full z-20 mt-1 bg-white border border-gray-100 rounded-lg shadow-lg py-1 min-w-[120px]', isMine ? 'right-0' : 'left-0')}>
+                      <div className={cn('absolute top-full z-20 mt-1 bg-white border border-gray-100 rounded-xl shadow-lg py-1 min-w-[120px]', isMine ? 'right-0' : 'left-0')}>
                         {isMine && msg.type === 'TEXT' && (
                           <button
                             onClick={() => { setEditingId(msg.id); setEditContent(msg.content); setMenuOpen(null); }}
-                            className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           >
                             <Pencil className="h-3.5 w-3.5" /> 수정
                           </button>
                         )}
                         {isMine && (
-                          <button onClick={() => handleDelete(msg.id)} className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-red-500 hover:bg-red-50">
+                          <button onClick={() => handleDelete(msg.id)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50">
                             <Trash2 className="h-3.5 w-3.5" /> 삭제
                           </button>
                         )}
                         {!isMine && (
-                          <button onClick={() => handleReport(msg.id)} className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">
+                          <button onClick={() => handleReport(msg.id)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                             <Flag className="h-3.5 w-3.5" /> 신고
                           </button>
                         )}

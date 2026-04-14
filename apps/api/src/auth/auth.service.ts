@@ -52,6 +52,19 @@ export class AuthService {
     return this.issueTokens(user.id, user.email, user.role);
   }
 
+  async refreshWithToken(refreshToken: string) {
+    try {
+      const payload = this.jwt.verify(refreshToken, {
+        secret: (process.env.JWT_SECRET || '') + '_refresh',
+      }) as { sub: string; email: string; role: string };
+      const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+      if (!user) throw new UnauthorizedException();
+      return this.issueTokens(user.id, user.email, user.role);
+    } catch {
+      throw new UnauthorizedException('유효하지 않은 리프레시 토큰입니다.');
+    }
+  }
+
   async logout(res: any) {
     res.clearCookie('refresh_token', {
       httpOnly: true,
