@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Patch, Post, Delete, Body, UseGuards,
+  Controller, Get, Patch, Post, Delete, Body, Param, UseGuards,
   UseInterceptors, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -60,5 +60,14 @@ export class UsersController {
   @Delete('me')
   deleteMe(@CurrentUser('sub') userId: string) {
     return this.usersService.deleteMe(userId);
+  }
+
+  @Post(':id/report')
+  reportUser(
+    @CurrentUser('sub') reporterId: string,
+    @Param('id') targetUserId: string,
+    @Body() body: { reason: string; detail?: string },
+  ) {
+    return this.usersService.reportUser(reporterId, targetUserId, body.reason, body.detail);
   }
 }

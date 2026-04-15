@@ -2,21 +2,27 @@
 
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Check, Trash2, ChevronDown, Circle } from 'lucide-react';
+import { Plus, Check, Trash2, ChevronDown, Sparkles, ThumbsUp, ThumbsDown, MessageCircle, Send, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Mascot } from '@/components/ui/Mascot';
+import { Avatar } from '@/components/ui/avatar';
+import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 
 interface Category { id: string; name: string; color: string }
+interface Reaction { type: 'LIKE' | 'DISLIKE'; userId: string }
 interface Todo {
   id: string;
   title: string;
   isCompleted: boolean;
   dueDate?: string;
   category?: Category;
+  _count?: { comments: number; reactions: number };
+  reactions?: Reaction[];
 }
 interface Props { todos: Todo[]; onRefetch: () => void; date: string }
 
-const PRESET_COLORS = ['#7c6ff7', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+const PRESET_COLORS = ['#8b5cf6', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#f97316'];
 
 export function TodoList({ todos, onRefetch, date }: Props) {
   const qc = useQueryClient();
@@ -45,6 +51,15 @@ export function TodoList({ todos, onRefetch, date }: Props) {
     } catch {}
   };
 
+  const handleDeleteCategory = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await api.delete(`/todo-categories/${id}`);
+      if (newCategoryId === id) setNewCategoryId(null);
+      qc.invalidateQueries({ queryKey: ['todo-categories'] });
+    } catch {}
+  };
+
   const handleAdd = async () => {
     if (!newTitle.trim()) return;
     try {
@@ -55,15 +70,30 @@ export function TodoList({ todos, onRefetch, date }: Props) {
       });
       setNewTitle(''); setNewCategoryId(null); setAdding(false); setShowCatPicker(false);
       onRefetch();
+      qc.invalidateQueries({ queryKey: ['todos-monthly-stats'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['crew-today-stats'] });
     } catch {}
   };
 
   const handleToggle = async (id: string) => {
-    try { await api.patch(`/todos/${id}/complete`); onRefetch(); } catch {}
+    try {
+      await api.patch(`/todos/${id}/complete`);
+      onRefetch();
+      qc.invalidateQueries({ queryKey: ['todos-monthly-stats'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['crew-today-stats'] });
+    } catch {}
   };
 
   const handleDelete = async (id: string) => {
-    try { await api.delete(`/todos/${id}`); onRefetch(); } catch {}
+    try {
+      await api.delete(`/todos/${id}`);
+      onRefetch();
+      qc.invalidateQueries({ queryKey: ['todos-monthly-stats'] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['crew-today-stats'] });
+    } catch {}
   };
 
   const pending = todos.filter((t) => !t.isCompleted);
@@ -75,21 +105,22 @@ export function TodoList({ todos, onRefetch, date }: Props) {
       {!adding ? (
         <button
           onClick={() => setAdding(true)}
-          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-dashed border-gray-200 text-gray-400 hover:border-primary-300 hover:text-primary-500 hover:bg-primary-50/30 transition-all group"
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-3xl border-2 border-dashed border-primary-200 text-primary-400 hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/40 transition-all group"
         >
-          <div className="h-6 w-6 rounded-full border-2 border-dashed border-gray-300 group-hover:border-primary-400 flex items-center justify-center transition-colors">
+          <div className="h-6 w-6 rounded-full border-2 border-dashed border-primary-300 group-hover:border-primary-500 flex items-center justify-center transition-colors">
             <Plus className="h-3.5 w-3.5" />
           </div>
-          <span className="text-sm font-medium">할일 추가하기</span>
+          <span className="text-sm font-semibold">할일 추가하기</span>
+          <Sparkles className="h-3.5 w-3.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
         </button>
       ) : (
-        <div className="card p-4 space-y-3 border-primary-200 shadow-md shadow-primary-50">
+        <div className="card p-4 space-y-3" style={{ borderColor: '#c4b5fd', boxShadow: '0 4px 20px rgba(139,92,246,0.12)' }}>
           {/* Category picker */}
           <div className="relative">
             <button
               type="button"
               onClick={() => { setShowCatPicker((v) => !v); setCreatingCat(false); }}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm hover:border-gray-300 transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-2xl border border-primary-100 bg-cream-100 text-sm hover:border-primary-300 transition-colors"
             >
               {selectedCat ? (
                 <>
@@ -103,30 +134,38 @@ export function TodoList({ todos, onRefetch, date }: Props) {
             </button>
 
             {showCatPicker && (
-              <div className="absolute top-full left-0 mt-1 z-30 w-full bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden">
+              <div className="absolute top-full left-0 mt-1 z-30 w-full bg-white border border-primary-100 rounded-3xl shadow-soft overflow-hidden">
                 <button
                   onClick={() => { setNewCategoryId(null); setShowCatPicker(false); }}
-                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50"
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-400 hover:bg-primary-50"
                 >
                   없음
                 </button>
                 {categories.map((cat) => (
-                  <button key={cat.id}
-                    onClick={() => { setNewCategoryId(cat.id); setShowCatPicker(false); }}
-                    className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                    {cat.name}
-                  </button>
+                  <div key={cat.id} className="group flex items-center hover:bg-primary-50">
+                    <button
+                      onClick={() => { setNewCategoryId(cat.id); setShowCatPicker(false); }}
+                      className="flex items-center gap-2.5 flex-1 px-4 py-2.5 text-sm text-gray-700"
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                      {cat.name}
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteCategory(e, cat.id)}
+                      className="pr-3 opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
                 {!creatingCat ? (
                   <button onClick={() => setCreatingCat(true)}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-primary-600 hover:bg-primary-50 border-t border-gray-100"
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-primary-600 hover:bg-primary-50 border-t border-primary-100"
                   >
                     <Plus className="h-3.5 w-3.5" /> 새 카테고리
                   </button>
                 ) : (
-                  <div className="p-4 border-t border-gray-100 space-y-2.5">
+                  <div className="p-4 border-t border-primary-100 space-y-2.5">
                     <input autoFocus className="input-field text-sm py-2"
                       placeholder="카테고리 이름"
                       value={newCatName}
@@ -135,13 +174,13 @@ export function TodoList({ todos, onRefetch, date }: Props) {
                     <div className="flex flex-wrap gap-2">
                       {PRESET_COLORS.map((c) => (
                         <button key={c} onClick={() => setNewCatColor(c)}
-                          className={cn('h-5 w-5 rounded-full transition-all', newCatColor === c && 'ring-2 ring-offset-2 ring-gray-400 scale-110')}
+                          className={cn('h-5 w-5 rounded-full transition-all', newCatColor === c && 'ring-2 ring-offset-2 ring-primary-400 scale-110')}
                           style={{ backgroundColor: c }} />
                       ))}
                     </div>
                     <div className="flex gap-2">
                       <button onClick={handleCreateCategory}
-                        className="flex-1 py-1.5 bg-primary-500 text-white rounded-xl text-xs font-semibold hover:bg-primary-600 transition-colors">
+                        className="flex-1 py-1.5 bg-primary-500 text-white rounded-2xl text-xs font-semibold hover:bg-primary-600 transition-colors">
                         만들기
                       </button>
                       <button onClick={() => setCreatingCat(false)}
@@ -166,11 +205,11 @@ export function TodoList({ todos, onRefetch, date }: Props) {
           />
           <div className="flex gap-2">
             <button onClick={handleAdd}
-              className="flex-1 py-2.5 bg-primary-500 text-white text-sm font-semibold rounded-xl hover:bg-primary-600 transition-colors shadow-sm shadow-primary-200">
-              추가
+              className="flex-1 py-2.5 bg-primary-500 text-white text-sm font-bold rounded-2xl hover:bg-primary-600 transition-colors shadow-sm">
+              추가하기
             </button>
             <button onClick={() => { setAdding(false); setNewTitle(''); setNewCategoryId(null); setShowCatPicker(false); }}
-              className="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              className="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors">
               취소
             </button>
           </div>
@@ -179,24 +218,37 @@ export function TodoList({ todos, onRefetch, date }: Props) {
 
       {/* Empty state */}
       {todos.length === 0 && !adding && (
-        <div className="card py-14 text-center">
-          <div className="h-14 w-14 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-3">
-            <Circle className="h-7 w-7 text-primary-300" />
+        <div className="card py-12 text-center flex flex-col items-center gap-2">
+          <div className="mascot-float">
+            <Mascot size={72} variant="sleep" />
           </div>
-          <p className="text-sm font-semibold text-gray-500">할일이 없는 날이에요</p>
-          <p className="text-xs text-gray-400 mt-1">위 버튼으로 할일을 추가해보세요</p>
+          <p className="text-sm font-bold mt-1" style={{ color: '#6d28d9' }}>오늘은 할일이 없어요!</p>
+          <p className="text-xs text-gray-400">토리가 기다리고 있어요</p>
+        </div>
+      )}
+
+      {/* All done state */}
+      {todos.length > 0 && pending.length === 0 && (
+        <div className="card py-8 text-center flex flex-col items-center gap-1.5">
+          <div className="hover-wiggle">
+            <Mascot size={56} variant="happy" />
+          </div>
+          <p className="text-sm font-bold" style={{ color: '#6d28d9' }}>모든 할일 완료!</p>
+          <p className="text-xs text-gray-400">토리가 기뻐하고 있어요</p>
         </div>
       )}
 
       {/* Pending todos */}
       {pending.length > 0 && (
         <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-50">
-            <span className="text-xs font-semibold text-gray-400">진행 중 · {pending.length}개</span>
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid #f5f3ff' }}>
+            <span className="text-xs font-bold text-primary-400">진행 중 · {pending.length}개</span>
           </div>
-          <div className="divide-y divide-gray-50">
-            {pending.map((todo) => (
-              <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
+          <div>
+            {pending.map((todo, i) => (
+              <div key={todo.id} style={i > 0 ? { borderTop: '1px solid #f5f3ff' } : {}}>
+                <TodoItem todo={todo} onToggle={handleToggle} onDelete={handleDelete} onRefetch={onRefetch} />
+              </div>
             ))}
           </div>
         </div>
@@ -204,14 +256,16 @@ export function TodoList({ todos, onRefetch, date }: Props) {
 
       {/* Completed todos */}
       {completed.length > 0 && (
-        <div className="card overflow-hidden opacity-75">
-          <div className="px-4 py-3 border-b border-gray-50 flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-400">완료 · {completed.length}개</span>
-            <div className="flex-1 h-px bg-gray-100" />
+        <div className="card overflow-hidden opacity-80">
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #f5f3ff' }}>
+            <span className="text-xs font-bold text-gray-400">완료 · {completed.length}개</span>
+            <div className="flex-1 h-px bg-primary-100" />
           </div>
-          <div className="divide-y divide-gray-50">
-            {completed.map((todo) => (
-              <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
+          <div>
+            {completed.map((todo, i) => (
+              <div key={todo.id} style={i > 0 ? { borderTop: '1px solid #f5f3ff' } : {}}>
+                <TodoItem todo={todo} onToggle={handleToggle} onDelete={handleDelete} onRefetch={onRefetch} />
+              </div>
             ))}
           </div>
         </div>
@@ -220,55 +274,184 @@ export function TodoList({ todos, onRefetch, date }: Props) {
   );
 }
 
-function TodoItem({ todo, onToggle, onDelete }: { todo: Todo; onToggle: (id: string) => void; onDelete: (id: string) => void }) {
+function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
+  todo: Todo;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onRefetch: () => void;
+}) {
+  const me = useAuthStore((s) => s.user);
+  const qc = useQueryClient();
+  const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+
+  const myReaction = todo.reactions?.find((r) => r.userId === me?.id);
+  const likes = todo.reactions?.filter((r) => r.type === 'LIKE').length ?? 0;
+  const dislikes = todo.reactions?.filter((r) => r.type === 'DISLIKE').length ?? 0;
+  const commentCount = todo._count?.comments ?? 0;
+
+  const hasActivity = likes > 0 || dislikes > 0 || commentCount > 0;
+
+  const handleReact = async (type: 'LIKE' | 'DISLIKE') => {
+    await api.post(`/todos/${todo.id}/reactions`, { type }).catch(() => {});
+    onRefetch();
+    qc.invalidateQueries({ queryKey: ['todos-monthly-stats'] });
+  };
+
+  const toggleComments = async () => {
+    if (!showComments && comments.length === 0) {
+      setLoadingComments(true);
+      try {
+        const res = await api.get(`/todos/${todo.id}/comments`);
+        setComments(res.data?.items ?? res.data ?? []);
+      } catch {}
+      setLoadingComments(false);
+    }
+    setShowComments((v) => !v);
+  };
+
+  const handleComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      await api.post(`/todos/${todo.id}/comments`, { content: commentText.trim() });
+      setCommentText('');
+      const res = await api.get(`/todos/${todo.id}/comments`);
+      setComments(res.data?.items ?? res.data ?? []);
+      onRefetch();
+    } catch {}
+  };
+
   return (
-    <div className={cn('group flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors relative')}>
+    <div className={cn('group relative transition-colors hover:bg-primary-50/50')}>
       {/* Category color bar */}
       {todo.category && !todo.isCompleted && (
         <div
-          className="absolute left-0 top-1/4 bottom-1/4 w-0.5 rounded-full"
+          className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full"
           style={{ backgroundColor: todo.category.color }}
         />
       )}
 
-      <button
-        onClick={() => onToggle(todo.id)}
-        className={cn(
-          'h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all',
-          todo.isCompleted
-            ? 'bg-primary-500 border-primary-500'
-            : 'border-gray-300 hover:border-primary-400 hover:bg-primary-50',
-        )}
-      >
-        {todo.isCompleted && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-      </button>
+      {/* Main row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          onClick={() => onToggle(todo.id)}
+          className={cn(
+            'h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all',
+            todo.isCompleted
+              ? 'bg-primary-500 border-primary-500 scale-95'
+              : 'border-primary-300 hover:border-primary-500 hover:bg-primary-50',
+          )}
+        >
+          {todo.isCompleted && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+        </button>
 
-      <div className="flex-1 min-w-0">
-        <p className={cn(
-          'text-sm leading-snug',
-          todo.isCompleted ? 'line-through text-gray-400' : 'text-gray-800 font-medium',
-        )}>
-          {todo.title}
-        </p>
-        {todo.category && (
-          <span
-            className="inline-block text-[11px] px-2 py-0.5 rounded-full mt-0.5 font-semibold"
-            style={{
-              backgroundColor: todo.category.color + '18',
-              color: todo.category.color,
-            }}
-          >
-            {todo.category.name}
-          </span>
-        )}
+        <div className="flex-1 min-w-0">
+          <p className={cn(
+            'text-sm leading-snug',
+            todo.isCompleted ? 'line-through text-gray-400' : 'text-gray-800 font-medium',
+          )}>
+            {todo.title}
+          </p>
+          {todo.category && (
+            <span
+              className="inline-block text-[11px] px-2 py-0.5 rounded-full mt-0.5 font-semibold"
+              style={{ backgroundColor: todo.category.color + '18', color: todo.category.color }}
+            >
+              {todo.category.name}
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={() => onDelete(todo.id)}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400 p-1.5 rounded-xl hover:bg-red-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       </div>
 
-      <button
-        onClick={() => onDelete(todo.id)}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-50"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
+      {/* Reactions + comments bar — 활동 있거나 hover 시 표시 */}
+      {(hasActivity || true) && (
+        <div className="flex items-center gap-0.5 px-4 pb-2.5 -mt-1">
+          <button
+            onClick={() => handleReact('LIKE')}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              myReaction?.type === 'LIKE'
+                ? 'bg-primary-50 text-primary-600 font-semibold'
+                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50',
+            )}
+          >
+            <ThumbsUp className="h-3 w-3" />
+            {likes > 0 && <span>{likes}</span>}
+          </button>
+          <button
+            onClick={() => handleReact('DISLIKE')}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              myReaction?.type === 'DISLIKE'
+                ? 'bg-red-50 text-red-500 font-semibold'
+                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50',
+            )}
+          >
+            <ThumbsDown className="h-3 w-3" />
+            {dislikes > 0 && <span>{dislikes}</span>}
+          </button>
+          <button
+            onClick={toggleComments}
+            className={cn(
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
+              showComments
+                ? 'bg-gray-100 text-gray-600 font-semibold'
+                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-50',
+            )}
+          >
+            <MessageCircle className="h-3 w-3" />
+            {commentCount > 0 && <span>{commentCount}</span>}
+          </button>
+        </div>
+      )}
+
+      {/* Comments section */}
+      {showComments && (
+        <div className="px-4 pb-3 space-y-2" style={{ borderTop: '1px solid #f5f3ff' }}>
+          <div className="pt-2 space-y-1.5">
+            {loadingComments ? (
+              <p className="text-xs text-gray-400 py-1">불러오는 중...</p>
+            ) : comments.length === 0 ? (
+              <p className="text-xs text-gray-400 py-1">첫 댓글을 남겨보세요.</p>
+            ) : (
+              comments.map((c: any) => (
+                <div key={c.id} className="flex items-start gap-2">
+                  <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
+                  <div className="flex-1 bg-gray-50 rounded-xl px-2.5 py-1.5">
+                    <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
+                    <p className="text-xs text-gray-500 mt-0.5">{c.content}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              className="input-field flex-1 text-xs py-1.5"
+              placeholder="댓글 달기..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleComment()}
+            />
+            <button
+              onClick={handleComment}
+              disabled={!commentText.trim()}
+              className="px-2.5 py-1.5 bg-primary-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40 transition-colors"
+            >
+              <Send className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

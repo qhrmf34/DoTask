@@ -2,19 +2,16 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, LogOut, Trash2, Plus } from 'lucide-react';
+import { Camera, LogOut } from 'lucide-react';
 import { useDialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+// cn kept for potential future use
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
-
-const PRESET_COLORS = ['#7c6ff7', '#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
-
-interface Category { id: string; name: string; color: string }
 
 export default function SettingsPage() {
   const { user, setUser, logout } = useAuthStore();
@@ -25,9 +22,6 @@ export default function SettingsPage() {
 
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [bio, setBio] = useState('');
-  const [addingCat, setAddingCat] = useState(false);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatColor, setNewCatColor] = useState(PRESET_COLORS[0]);
 
   const { data: profile } = useQuery({
     queryKey: ['me'],
@@ -37,11 +31,6 @@ export default function SettingsPage() {
   const { data: stats } = useQuery<{ totalCompleted: number; monthPct: number; crewCount: number; streak: number }>({
     queryKey: ['me-stats'],
     queryFn: () => api.get('/users/me/stats').then((r) => r.data).catch(() => null),
-  });
-
-  const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['todo-categories'],
-    queryFn: () => api.get('/todo-categories').then((r) => r.data).catch(() => []),
   });
 
   useEffect(() => {
@@ -76,25 +65,6 @@ export default function SettingsPage() {
     await api.post('/auth/logout').catch(() => {});
     logout();
     router.push('/login');
-  };
-
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    try {
-      await api.post('/todo-categories', { name: newCatName.trim(), color: newCatColor });
-      qc.invalidateQueries({ queryKey: ['todo-categories'] });
-      setNewCatName('');
-      setAddingCat(false);
-    } catch {}
-  };
-
-  const handleDeleteCategory = async (id: string) => {
-    const ok = await confirm({ title: '카테고리 삭제', message: '이 카테고리를 삭제할까요?', confirmText: '삭제', cancelText: '취소', type: 'danger' });
-    if (!ok) return;
-    try {
-      await api.delete(`/todo-categories/${id}`);
-      qc.invalidateQueries({ queryKey: ['todo-categories'] });
-    } catch {}
   };
 
   const statItems = stats ? [
@@ -161,69 +131,6 @@ export default function SettingsPage() {
             </div>
             <Button onClick={handleSaveProfile} className="w-full">저장</Button>
           </div>
-        </section>
-
-        {/* ── Categories ── */}
-        <section className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold text-gray-800">할일 카테고리</h2>
-              <p className="text-xs text-gray-400 mt-0.5">{categories.length}개</p>
-            </div>
-            <button
-              onClick={() => setAddingCat(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-50 text-primary-600 hover:bg-primary-100 text-xs font-semibold transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" /> 추가
-            </button>
-          </div>
-
-          {addingCat && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-2xl space-y-3 border border-gray-100">
-              <input
-                autoFocus
-                className="input-field text-sm"
-                placeholder="카테고리 이름"
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-              />
-              <div className="flex flex-wrap gap-2">
-                {PRESET_COLORS.map((c) => (
-                  <button key={c} onClick={() => setNewCatColor(c)}
-                    className={cn('h-6 w-6 rounded-full transition-all', newCatColor === c && 'ring-2 ring-offset-2 ring-gray-400 scale-110')}
-                    style={{ backgroundColor: c }} />
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleAddCategory}
-                  className="flex-1 py-2 bg-primary-500 text-white rounded-xl text-xs font-semibold hover:bg-primary-600">
-                  만들기
-                </button>
-                <button onClick={() => { setAddingCat(false); setNewCatName(''); }}
-                  className="px-3 py-2 text-gray-400 hover:text-gray-600 text-xs">취소</button>
-              </div>
-            </div>
-          )}
-
-          {categories.length === 0 && !addingCat ? (
-            <p className="text-sm text-gray-400 py-3 text-center">카테고리가 없습니다.</p>
-          ) : (
-            <div className="space-y-1">
-              {categories.map((cat) => (
-                <div key={cat.id} className="group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                  <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                  <span className="flex-1 text-sm font-medium text-gray-700">{cat.name}</span>
-                  <button
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400 p-1 rounded-lg"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {/* ── Account ── */}

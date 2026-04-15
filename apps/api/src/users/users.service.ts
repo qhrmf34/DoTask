@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -83,5 +83,14 @@ export class UsersService {
     }
 
     return { totalCompleted, monthPct, crewCount, streak };
+  }
+
+  async reportUser(reporterId: string, targetUserId: string, reason: string, detail?: string) {
+    if (reporterId === targetUserId) throw new ForbiddenException('본인을 신고할 수 없습니다.');
+    const target = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target) throw new NotFoundException();
+    return this.prisma.report.create({
+      data: { reporterId, targetType: 'USER', targetUserId, reason, detail },
+    });
   }
 }

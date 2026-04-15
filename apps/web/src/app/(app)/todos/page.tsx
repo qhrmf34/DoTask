@@ -59,13 +59,16 @@ export default function TodosPage() {
 
           {/* Monthly progress */}
           <div className="mt-3 flex items-center gap-3">
-            <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div className="flex-1 h-2 bg-primary-100 rounded-full overflow-hidden">
               <div
-                className={cn('h-full rounded-full transition-all duration-700', monthlyPct >= 100 ? 'bg-green-400' : 'bg-primary-400')}
+                className={cn(
+                  'h-full rounded-full transition-all duration-700',
+                  monthlyPct >= 100 ? 'bg-mint-400' : 'progress-shimmer',
+                )}
                 style={{ width: `${Math.min(monthlyPct, 100)}%` }}
               />
             </div>
-            <span className={cn('text-sm font-bold tabular-nums shrink-0', monthlyPct >= 100 ? 'text-green-500' : 'text-primary-600')}>
+            <span className={cn('text-sm font-bold tabular-nums shrink-0', monthlyPct >= 100 ? 'text-mint-500' : 'text-primary-600')}>
               {monthlyPct}%
             </span>
             <span className="text-xs text-gray-400 shrink-0">

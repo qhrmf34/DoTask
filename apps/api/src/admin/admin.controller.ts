@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Patch, Delete, Param, Query, Body, UseGuards,
+  Controller, Get, Patch, Post, Delete, Param, Query, Body, UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -58,6 +58,24 @@ export class AdminController {
     return this.service.deleteCrew(crewId);
   }
 
+  @Get('crews/:id/posts')
+  getCrewPosts(
+    @Param('id') crewId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getCrewPosts(crewId, page ? +page : 1, limit ? +limit : 10);
+  }
+
+  @Get('crews/:id/messages')
+  getCrewMessages(
+    @Param('id') crewId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.service.getCrewMessages(crewId, page ? +page : 1, limit ? +limit : 10);
+  }
+
   // ── 게시글 관리 ───────────────────────────────────────────────
   @Get('posts')
   getPosts(
@@ -102,5 +120,10 @@ export class AdminController {
     @Body('status') status: 'REVIEWED' | 'DISMISSED',
   ) {
     return this.service.updateReportStatus(reportId, status);
+  }
+
+  @Post('reports/:id/notify')
+  notifyReporter(@Param('id') reportId: string) {
+    return this.service.notifyReporter(reportId);
   }
 }

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut } from 'lucide-react';
+import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut, ShieldCheck, ShieldOff, Flag } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -213,7 +213,7 @@ function MemberTodosPanel({
   const rc = roleConfig[member.role] ?? roleConfig.MEMBER;
 
   return (
-    <div className="flex flex-col h-full bg-white border-l border-gray-100 w-80 shrink-0">
+    <div className="flex flex-col h-full w-80 shrink-0" style={{ background: '#f7f8fa', borderLeft: '1px solid #e8e4f8' }}>
       {/* Panel header */}
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -263,7 +263,7 @@ function MemberTodosPanel({
       </div>
 
       {/* Todo list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-2 bg-gray-50">
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-2" style={{ background: '#f7f8fa' }}>
         {todos.length === 0 ? (
           <div className="py-10 text-center">
             <p className="text-sm text-gray-400">할일이 없습니다</p>
@@ -320,6 +320,31 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   const { confirm } = useDialog();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [reportModal, setReportModal] = useState<{ userId: string; nickname: string } | null>(null);
+  const [reportReason, setReportReason] = useState('INAPPROPRIATE');
+  const [reportDetail, setReportDetail] = useState('');
+
+  const REPORT_REASONS = [
+    { value: 'SPAM', label: '스팸 / 홍보' },
+    { value: 'ABUSE', label: '욕설 / 비방' },
+    { value: 'HATE', label: '혐오 / 차별' },
+    { value: 'INAPPROPRIATE', label: '부적절한 행동' },
+    { value: 'OTHER', label: '기타' },
+  ];
+
+  const handleReport = (m: Member) => {
+    setMenuOpen(null);
+    setReportReason('INAPPROPRIATE');
+    setReportDetail('');
+    setReportModal({ userId: m.user.id, nickname: m.user.nickname });
+  };
+
+  const submitReport = async () => {
+    if (!reportModal) return;
+    await api.post(`/users/${reportModal.userId}/report`, { reason: reportReason, detail: reportDetail || undefined }).catch(() => {});
+    setReportModal(null);
+    await confirm({ title: '신고 완료', message: '신고가 접수되었습니다.', confirmText: '확인', type: 'alert' });
+  };
 
   const { data: members = [], refetch } = useQuery<Member[]>({
     queryKey: ['crew-members', crewId],
@@ -335,6 +360,25 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     const order = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
     return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
   });
+
+  const handleSetRole = async (m: Member, role: 'ADMIN' | 'MEMBER') => {
+    const label = role === 'ADMIN' ? '부방장' : '일반 멤버';
+    const ok = await confirm({
+      title: role === 'ADMIN' ? '부방장 임명' : '부방장 해제',
+      message: `${m.user.nickname}님을 ${label}로 변경할까요?`,
+      confirmText: '변경',
+      cancelText: '취소',
+      type: 'alert',
+    });
+    if (!ok) return;
+    try {
+      await api.patch(`/crews/${crewId}/members/${m.user.id}`, { role });
+      setMenuOpen(null);
+      refetch();
+    } catch (e: any) {
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '변경에 실패했습니다.', confirmText: '확인', type: 'alert' });
+    }
+  };
 
   const handleKick = async (m: Member) => {
     const ok = await confirm({
@@ -395,8 +439,8 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Member list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">
-        <div className="max-w-2xl mx-auto px-4 py-5">
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
+        <div className="max-w-3xl mx-auto px-6 py-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-base font-bold text-gray-900">멤버</h2>
@@ -423,7 +467,10 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
 
           <div className="space-y-2">
             {sorted.map((m) => {
-              const canKick = (isOwner || isAdmin) && m.user.id !== me?.id && m.role !== 'OWNER';
+              const canKick = (isOwner || isAdmin) && m.user.id !== me?.id && m.role !== 'OWNER' && !(isAdmin && m.role === 'ADMIN');
+              const canManageRole = isOwner && m.user.id !== me?.id && m.role !== 'OWNER';
+              const canReport = m.user.id !== me?.id;
+              const hasMenu = canKick || canManageRole || canReport;
               const isMenuOpen = menuOpen === m.id;
               const rc = roleConfig[m.role] ?? roleConfig.MEMBER;
               const isSelected = selectedMember?.id === m.id;
@@ -432,7 +479,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                 <div
                   key={m.id}
                   className={cn(
-                    'card-hover flex items-center overflow-hidden transition-all',
+                    'card-hover flex items-center transition-all',
                     isSelected && 'border-primary-200 bg-primary-50/30',
                   )}
                 >
@@ -454,7 +501,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                     </div>
                   </button>
 
-                  {canKick && (
+                  {hasMenu && (
                     <div className="pr-3 relative">
                       <button
                         onClick={(e) => { e.stopPropagation(); setMenuOpen(isMenuOpen ? null : m.id); }}
@@ -463,13 +510,39 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                         <MoreHorizontal className="h-4 w-4" />
                       </button>
                       {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-100 rounded-xl shadow-lg py-1 min-w-[110px]">
-                          <button
-                            onClick={() => handleKick(m)}
-                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50"
-                          >
-                            <UserMinus className="h-3.5 w-3.5" /> 강퇴
-                          </button>
+                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-100 rounded-xl shadow-lg py-1 min-w-[130px]">
+                          {canManageRole && m.role !== 'ADMIN' && (
+                            <button
+                              onClick={() => handleSetRole(m, 'ADMIN')}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50"
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" /> 부방장 임명
+                            </button>
+                          )}
+                          {canManageRole && m.role === 'ADMIN' && (
+                            <button
+                              onClick={() => handleSetRole(m, 'MEMBER')}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                            >
+                              <ShieldOff className="h-3.5 w-3.5" /> 부방장 해제
+                            </button>
+                          )}
+                          {canKick && (
+                            <button
+                              onClick={() => handleKick(m)}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50"
+                            >
+                              <UserMinus className="h-3.5 w-3.5" /> 강퇴
+                            </button>
+                          )}
+                          {canReport && (
+                            <button
+                              onClick={() => handleReport(m)}
+                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 border-t border-gray-50"
+                            >
+                              <Flag className="h-3.5 w-3.5" /> 신고
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -488,6 +561,53 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
         />
+      )}
+
+      {/* 신고 모달 */}
+      {reportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.35)' }}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-base font-bold text-gray-900">{reportModal.nickname} 신고</h3>
+            <div className="space-y-2">
+              {REPORT_REASONS.map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => setReportReason(r.value)}
+                  className={cn(
+                    'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors border',
+                    reportReason === r.value
+                      ? 'bg-primary-50 border-primary-300 text-primary-700'
+                      : 'border-gray-100 text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="w-full border border-gray-200 rounded-2xl px-3 py-2 text-sm resize-none outline-none focus:border-primary-300"
+              rows={2}
+              placeholder="추가 설명 (선택)"
+              value={reportDetail}
+              onChange={(e) => setReportDetail(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setReportModal(null)}
+                className="flex-1 py-2.5 text-sm text-gray-400 border border-gray-200 rounded-2xl hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={submitReport}
+                className="flex-1 py-2.5 text-sm font-bold text-white rounded-2xl"
+                style={{ background: 'linear-gradient(135deg,#a78bfa,#8b5cf6)' }}
+              >
+                신고하기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

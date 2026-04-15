@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, ThumbsUp, ThumbsDown, MessageCircle, Pin, MoreHorizontal, Trash2, Flag, X, Send } from 'lucide-react';
+import { Mascot } from '@/components/ui/Mascot';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
 import { cn, formatDate } from '@/lib/utils';
@@ -316,8 +317,8 @@ export default function BoardPage({ params }: { params: { crewId: string } }) {
   const regularPosts = posts.filter((p) => !p.isPinned);
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-4 space-y-3">
+    <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
+      <div className="max-w-3xl mx-auto px-6 py-5 space-y-3">
         {/* Write card */}
         <WriteCard crewId={crewId} onPost={refetch} user={user} />
 
@@ -332,12 +333,12 @@ export default function BoardPage({ params }: { params: { crewId: string } }) {
         ))}
 
         {posts.length === 0 && (
-          <div className="py-16 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-              <MessageCircle className="h-7 w-7 text-gray-300" />
+          <div className="py-16 flex flex-col items-center gap-3">
+            <div className="mascot-float">
+              <Mascot size={72} variant="sleep" />
             </div>
-            <p className="text-sm font-medium text-gray-500">아직 게시글이 없습니다</p>
-            <p className="text-xs text-gray-400 mt-1">위 입력창으로 첫 번째 게시글을 작성해보세요</p>
+            <p className="text-sm font-bold" style={{ color: '#6d28d9' }}>아직 게시글이 없어요</p>
+            <p className="text-xs text-gray-400">첫 번째 게시글을 작성해보세요</p>
           </div>
         )}
 

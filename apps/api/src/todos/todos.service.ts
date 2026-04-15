@@ -21,6 +21,7 @@ export class TodosService {
       include: {
         category: true,
         _count: { select: { comments: true, reactions: true } },
+        reactions: { select: { type: true, userId: true } },
       },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
