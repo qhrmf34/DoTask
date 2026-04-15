@@ -554,22 +554,19 @@ export default function CrewLayout({
           {/* ── Right panel ── */}
           <div
             className="hidden lg:flex flex-col w-64 shrink-0 overflow-y-auto scrollbar-thin"
-            style={{
-              background: 'linear-gradient(180deg, #f3f2fe 0%, #f7f8fa 100%)',
-              borderLeft: '1px solid #e8e4f8',
-            }}
+            style={{ background: 'white', borderLeft: '1.5px solid #e8e4f8' }}
           >
             <CrewPomoPanel crewId={crewId} />
 
             {/* Recent chat */}
-            <div className="p-3" style={{ borderBottom: '1px solid #e8e4f8' }}>
-              <p className="text-[10px] font-bold text-primary-400 uppercase tracking-wider mb-2.5 px-1">최근 채팅</p>
+            <div className="px-4 py-3" style={{ borderBottom: '1.5px solid #f0eeff' }}>
+              <p className="text-[11px] font-extrabold mb-3 tracking-wide" style={{ color: '#7c3aed' }}>최근 채팅</p>
               <RecentChatPanel channels={channels} crewId={crewId} />
             </div>
 
             {/* Latest post activity */}
-            <div className="p-3">
-              <p className="text-[10px] font-bold text-primary-400 uppercase tracking-wider mb-2.5 px-1">게시판 활동</p>
+            <div className="px-4 py-3">
+              <p className="text-[11px] font-extrabold mb-3 tracking-wide" style={{ color: '#7c3aed' }}>게시판 활동</p>
               <LatestPostPanel crewId={crewId} />
             </div>
           </div>
@@ -585,28 +582,28 @@ function RecentChatPanel({ channels, crewId }: { channels: Channel[]; crewId: st
     .sort((a, b) => new Date(b.lastMessage!.createdAt).getTime() - new Date(a.lastMessage!.createdAt).getTime())
     .slice(0, 4);
 
-  if (!recent.length) return <p className="text-xs text-gray-400 px-1">아직 대화가 없습니다.</p>;
+  if (!recent.length) return <p className="text-xs text-gray-400">아직 대화가 없습니다.</p>;
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       {recent.map((ch) => {
         const last = ch.lastMessage!;
-        const preview = last.type === 'IMAGE' ? '이미지를 보냈습니다'
-          : last.type === 'FILE' ? '파일을 보냈습니다'
+        const preview = last.type === 'IMAGE' ? '🖼 이미지'
+          : last.type === 'FILE' ? '📎 파일'
           : last.content;
         return (
           <Link key={ch.id} href={`/crews/${crewId}/channels/${ch.id}`}
-            className="flex items-start gap-2 p-2 rounded-2xl hover:bg-primary-50 transition-colors"
+            className="flex items-start gap-2.5 px-2.5 py-2 rounded-2xl hover:bg-primary-50 transition-colors group"
           >
-            <div className="h-6 w-6 rounded-xl bg-primary-100 flex items-center justify-center shrink-0 mt-0.5">
-              <Hash className="h-3 w-3 text-primary-500" />
+            <div className="h-7 w-7 rounded-xl bg-primary-100 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary-200 transition-colors">
+              <Hash className="h-3.5 w-3.5 text-primary-500" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-gray-600 truncate">{last.user.nickname}</span>
-                <span className="text-[10px] text-primary-300 shrink-0">#{ch.name}</span>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="text-xs font-bold text-gray-700 truncate">{last.user.nickname}</span>
+                <span className="text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full bg-primary-50 text-primary-400">#{ch.name}</span>
               </div>
-              <p className="text-[11px] text-gray-400 truncate mt-0.5">{preview}</p>
+              <p className="text-xs text-gray-500 truncate">{preview}</p>
             </div>
           </Link>
         );
@@ -626,24 +623,24 @@ function LatestPostPanel({ crewId }: { crewId: string }) {
   });
 
   if (!data?.length) {
-    return <p className="text-xs text-gray-400 px-1">아직 게시글이 없습니다.</p>;
+    return <p className="text-xs text-gray-400">아직 게시글이 없습니다.</p>;
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {data.map((post: any) => (
         <Link key={post.id} href={`/crews/${crewId}/board`}
-          className="block p-2.5 rounded-2xl hover:bg-primary-50 transition-colors"
-          style={{ border: '1px solid #e8e4f8' }}
+          className="block px-3 py-2.5 rounded-2xl hover:bg-primary-50 transition-colors"
+          style={{ border: '1.5px solid #ede9fe' }}
         >
-          <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="flex items-center gap-2 mb-1.5">
             <Avatar src={post.user?.profileImage} fallback={post.user?.nickname ?? '?'} size="xs" />
-            <span className="text-[11px] font-bold text-gray-700 truncate">{post.user?.nickname}</span>
+            <span className="text-xs font-bold text-gray-800 truncate">{post.user?.nickname}</span>
           </div>
-          <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">{post.content}</p>
-          <div className="flex items-center gap-3 mt-1.5">
-            <span className="text-[10px] text-primary-400 font-semibold">좋아요 {post._count?.reactions ?? 0}</span>
-            <span className="text-[10px] text-gray-400">댓글 {post._count?.comments ?? 0}</span>
+          <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{post.content}</p>
+          <div className="flex items-center gap-2.5 mt-2">
+            <span className="text-[10px] font-bold text-primary-500">👍 {post._count?.reactions ?? 0}</span>
+            <span className="text-[10px] text-gray-400 font-medium">💬 {post._count?.comments ?? 0}</span>
           </div>
         </Link>
       ))}

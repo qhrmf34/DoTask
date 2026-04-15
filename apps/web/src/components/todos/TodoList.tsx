@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Check, Trash2, ChevronDown, Sparkles, ThumbsUp, ThumbsDown, MessageCircle, Send, X } from 'lucide-react';
+import { Plus, Check, Trash2, ChevronDown, Sparkles, ThumbsUp, ThumbsDown, MessageCircle, Send, X, Flag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Mascot } from '@/components/ui/Mascot';
 import { Avatar } from '@/components/ui/avatar';
@@ -286,6 +286,9 @@ function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
   const [comments, setComments] = useState<any[]>([]);
   const [commentText, setCommentText] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
+  const [reportCommentId, setReportCommentId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetail, setReportDetail] = useState('');
 
   const myReaction = todo.reactions?.find((r) => r.userId === me?.id);
   const likes = todo.reactions?.filter((r) => r.type === 'LIKE').length ?? 0;
@@ -322,6 +325,29 @@ function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
       onRefetch();
     } catch {}
   };
+
+  const handleDeleteComment = async (commentId: string) => {
+    await api.delete(`/comments/${commentId}`).catch(() => {});
+    const res = await api.get(`/todos/${todo.id}/comments`);
+    setComments(res.data?.items ?? res.data ?? []);
+    onRefetch();
+  };
+
+  const handleReportComment = async () => {
+    if (!reportCommentId || !reportReason) return;
+    await api.post(`/comments/${reportCommentId}/report`, { reason: reportReason, detail: reportDetail }).catch(() => {});
+    setReportCommentId(null);
+    setReportReason('');
+    setReportDetail('');
+  };
+
+  const REPORT_REASONS = [
+    { value: 'SPAM', label: '스팸 / 홍보' },
+    { value: 'ABUSE', label: '욕설 / 비방' },
+    { value: 'HATE', label: '혐오 / 차별' },
+    { value: 'INAPPROPRIATE', label: '부적절한 내용' },
+    { value: 'OTHER', label: '기타' },
+  ];
 
   return (
     <div className={cn('group relative transition-colors hover:bg-primary-50/50')}>
@@ -414,6 +440,37 @@ function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
         </div>
       )}
 
+      {/* Comment report modal */}
+      {reportCommentId && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900">댓글 신고</h3>
+              <button onClick={() => setReportCommentId(null)} className="h-6 w-6 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="space-y-1.5">
+              {REPORT_REASONS.map((r) => (
+                <button key={r.value} onClick={() => setReportReason(r.value)}
+                  className={cn('w-full text-left px-3 py-2 rounded-xl text-xs font-medium border transition-all',
+                    reportReason === r.value ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-gray-100 text-gray-600 hover:border-primary-200')}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <textarea className="input-field resize-none text-xs w-full" rows={2} placeholder="추가 설명 (선택)"
+              value={reportDetail} onChange={(e) => setReportDetail(e.target.value)} />
+            <div className="flex gap-2">
+              <button onClick={() => setReportCommentId(null)} className="flex-1 py-2 rounded-2xl border border-gray-200 text-xs text-gray-500">취소</button>
+              <button onClick={handleReportComment} disabled={!reportReason}
+                className="flex-1 py-2 rounded-2xl bg-red-500 text-white text-xs font-semibold disabled:opacity-40">신고하기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Comments section */}
       {showComments && (
         <div className="px-4 pb-3 space-y-2" style={{ borderTop: '1px solid #f5f3ff' }}>
@@ -423,15 +480,37 @@ function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
             ) : comments.length === 0 ? (
               <p className="text-xs text-gray-400 py-1">첫 댓글을 남겨보세요.</p>
             ) : (
-              comments.map((c: any) => (
-                <div key={c.id} className="flex items-start gap-2">
-                  <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
-                  <div className="flex-1 bg-gray-50 rounded-xl px-2.5 py-1.5">
-                    <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
-                    <p className="text-xs text-gray-500 mt-0.5">{c.content}</p>
+              comments.map((c: any) => {
+                const isMyComment = c.user?.id === me?.id;
+                return (
+                  <div key={c.id} className="flex items-start gap-2 group/cmt">
+                    <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
+                    <div className="flex-1 bg-gray-50 rounded-xl px-2.5 py-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover/cmt:opacity-100 transition-opacity">
+                          {isMyComment ? (
+                            <button
+                              onClick={() => handleDeleteComment(c.id)}
+                              className="p-0.5 rounded text-gray-300 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setReportCommentId(c.id); setReportReason(''); setReportDetail(''); }}
+                              className="p-0.5 rounded text-gray-300 hover:text-orange-400 transition-colors"
+                            >
+                              <Flag className="h-2.5 w-2.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className={cn('text-xs text-gray-500 mt-0.5', c.isDeleted && 'text-gray-400 italic')}>{c.content}</p>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
           <div className="flex gap-1.5">

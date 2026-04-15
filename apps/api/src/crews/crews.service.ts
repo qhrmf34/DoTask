@@ -4,8 +4,11 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  forwardRef,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChatGateway } from '../chat/chat.gateway';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -28,7 +31,10 @@ const CREW_SELECT = {
 
 @Injectable()
 export class CrewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => ChatGateway)) private chatGateway: ChatGateway,
+  ) {}
 
   async search(q?: string, cat?: string, sort = 'popular') {
     return this.prisma.crew.findMany({
@@ -36,7 +42,7 @@ export class CrewsService {
         isDeleted: false,
         visibility: { in: ['PUBLIC', 'PASSWORD'] },
         ...(cat ? { category: cat } : {}),
-        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
+        ...(q ? { name: { contains: q } } : {}),
       },
       select: CREW_SELECT,
       orderBy: { createdAt: 'desc' },
@@ -175,7 +181,9 @@ export class CrewsService {
       if (!valid) throw new ForbiddenException('비밀번호가 올바르지 않습니다.');
     }
 
-    return this.prisma.crewMember.create({ data: { crewId, userId } });
+    const member = await this.prisma.crewMember.create({ data: { crewId, userId } });
+    this.sendJoinSystemMessage(crewId, userId);
+    return member;
   }
 
   async joinByInvite(userId: string, inviteCode: string) {
@@ -190,7 +198,9 @@ export class CrewsService {
     const count = await this.prisma.crewMember.count({ where: { crewId: crew.id } });
     if (count >= crew.maxMembers) throw new BadRequestException('크루 정원이 꽉 찼습니다.');
 
-    return this.prisma.crewMember.create({ data: { crewId: crew.id, userId } });
+    const member = await this.prisma.crewMember.create({ data: { crewId: crew.id, userId } });
+    this.sendJoinSystemMessage(crew.id, userId);
+    return member;
   }
 
   async leave(userId: string, crewId: string) {
@@ -241,6 +251,31 @@ export class CrewsService {
     const crew = await this.prisma.crew.findUnique({ where: { inviteCode }, select: CREW_SELECT });
     if (!crew) throw new NotFoundException();
     return crew;
+  }
+
+  private async sendJoinSystemMessage(crewId: string, userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { nickname: true } });
+      const generalChannel = await this.prisma.channel.findFirst({
+        where: { crewId, type: 'GENERAL' },
+        select: { id: true },
+      });
+      if (!generalChannel || !user) return;
+      // userId 필수 제약으로 DB 저장 없이 소켓으로만 브로드캐스트
+      const systemMsg = {
+        id: `system-${Date.now()}`,
+        channelId: generalChannel.id,
+        content: `${user.nickname}님이 크루에 참여했습니다.`,
+        type: 'SYSTEM',
+        isEdited: false,
+        isDeleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        userId: null,
+        user: null,
+      };
+      this.chatGateway.emitToChannel(generalChannel.id, 'chat:message', systemMsg);
+    } catch {}
   }
 
   private async assertOwner(userId: string, crewId: string) {

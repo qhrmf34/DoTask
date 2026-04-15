@@ -301,8 +301,17 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                   </div>
                 )}
 
+                {/* System message */}
+                {msg.type === 'SYSTEM' && (
+                  <div className="flex items-center justify-center py-1.5">
+                    <span className="text-[11px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                      {msg.content}
+                    </span>
+                  </div>
+                )}
+
                 {/* Message row */}
-                <div className={cn(
+                {msg.type !== 'SYSTEM' && <div className={cn(
                   'group flex items-end gap-2 px-1',
                   isMine ? 'justify-end' : 'justify-start',
                   showAvatar ? 'mt-3' : 'mt-0.5',
@@ -434,7 +443,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                       </div>
                     </div>
                   )}
-                </div>
+                </div>}
               </React.Fragment>
             );
           })}

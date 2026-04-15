@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Camera, X, Globe, Lock, EyeOff } from 'lucide-react';
+import { ArrowLeft, Camera, X, Globe, Lock, EyeOff, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,9 @@ export default function NewCrewPage() {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [createdCrewId, setCreatedCrewId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const bannerRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -81,11 +84,55 @@ export default function NewCrewPage() {
     setSubmitError('');
     try {
       const res = await api.post('/crews', { ...data, bannerImage: bannerUrl });
-      router.push(`/crews/${res.data.id}/board`);
+      if (data.visibility === 'PRIVATE' && res.data.inviteCode) {
+        setInviteCode(res.data.inviteCode);
+        setCreatedCrewId(res.data.id);
+      } else {
+        router.push(`/crews/${res.data.id}/board`);
+      }
     } catch (e: any) {
       setSubmitError(e.response?.data?.message || '크루 생성에 실패했습니다.');
     }
   };
+
+  const handleCopyInvite = () => {
+    if (!inviteCode) return;
+    const link = `${window.location.origin}/crews/invite/${inviteCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  if (inviteCode && createdCrewId) {
+    const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/crews/invite/${inviteCode}` : '';
+    return (
+      <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50 flex items-center justify-center p-4">
+        <div className="card max-w-sm w-full p-6 text-center space-y-4">
+          <div className="h-14 w-14 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto">
+            <EyeOff className="h-7 w-7 text-primary-500" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">크루가 생성됐어요!</h2>
+            <p className="text-sm text-gray-500 mt-1">초대 전용 크루입니다. 아래 링크를 공유하세요.</p>
+          </div>
+          <div className="bg-gray-50 rounded-2xl px-4 py-3 flex items-center gap-2 text-left">
+            <p className="text-xs text-gray-500 flex-1 break-all">{inviteLink}</p>
+            <button
+              onClick={handleCopyInvite}
+              className="shrink-0 h-8 w-8 rounded-xl flex items-center justify-center bg-primary-100 hover:bg-primary-200 text-primary-600 transition-colors"
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
+          {copied && <p className="text-xs text-primary-500 font-medium">링크가 복사됐습니다!</p>}
+          <Button className="w-full" onClick={() => router.push(`/crews/${createdCrewId}/board`)}>
+            크루로 이동
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin bg-gray-50">

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut, ShieldCheck, ShieldOff, Flag } from 'lucide-react';
+import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut, ShieldCheck, ShieldOff, Flag, Copy, Check, Settings, Camera } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -323,6 +323,15 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   const [reportModal, setReportModal] = useState<{ userId: string; nickname: string } | null>(null);
   const [reportReason, setReportReason] = useState('INAPPROPRIATE');
   const [reportDetail, setReportDetail] = useState('');
+  const [copiedInvite, setCopiedInvite] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
+  const [editBannerPreview, setEditBannerPreview] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const editBannerRef = useRef<HTMLInputElement>(null);
 
   const REPORT_REASONS = [
     { value: 'SPAM', label: '스팸 / 홍보' },
@@ -345,6 +354,11 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     setReportModal(null);
     await confirm({ title: '신고 완료', message: '신고가 접수되었습니다.', confirmText: '확인', type: 'alert' });
   };
+
+  const { data: crew } = useQuery<{ id: string; name: string; description?: string; category: string; visibility: string; inviteCode?: string; bannerImage?: string }>({
+    queryKey: ['crew', crewId],
+    queryFn: () => api.get(`/crews/${crewId}`).then((r) => r.data),
+  });
 
   const { data: members = [], refetch } = useQuery<Member[]>({
     queryKey: ['crew-members', crewId],
@@ -400,6 +414,52 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     }
   };
 
+  const handleCopyInvite = () => {
+    if (!crew?.inviteCode) return;
+    const link = `${window.location.origin}/crews/invite/${crew.inviteCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
+    });
+  };
+
+  const openEditModal = () => {
+    if (!crew) return;
+    setEditName(crew.name);
+    setEditDesc(crew.description ?? '');
+    setEditCategory(crew.category);
+    setEditBannerPreview(null);
+    setEditBannerFile(null);
+    setEditModal(true);
+  };
+
+  const handleEditBanner = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditBannerFile(file);
+    setEditBannerPreview(URL.createObjectURL(file));
+    e.target.value = '';
+  };
+
+  const handleEditSave = async () => {
+    setEditSaving(true);
+    try {
+      const form = new FormData();
+      form.append('name', editName);
+      form.append('description', editDesc);
+      form.append('category', editCategory);
+      if (editBannerFile) form.append('banner', editBannerFile);
+      await api.patch(`/crews/${crewId}`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+      qc.invalidateQueries({ queryKey: ['crew', crewId] });
+      qc.invalidateQueries({ queryKey: ['my-crews'] });
+      setEditModal(false);
+    } catch (e: any) {
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '수정에 실패했습니다.', confirmText: '확인', type: 'alert' });
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleLeave = async () => {
     const ok = await confirm({
       title: '크루 탈퇴',
@@ -446,7 +506,26 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
               <h2 className="text-base font-bold text-gray-900">멤버</h2>
               <p className="text-xs text-gray-400 mt-0.5">{members.length}명</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              {/* 초대링크 복사 - PRIVATE 크루의 방장/부방장만 */}
+              {(isOwner || isAdmin) && crew?.visibility === 'PRIVATE' && (
+                <button
+                  onClick={handleCopyInvite}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
+                >
+                  {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedInvite ? '복사됨' : '초대링크'}
+                </button>
+              )}
+              {/* 크루 수정 - 방장/부방장 */}
+              {(isOwner || isAdmin) && (
+                <button
+                  onClick={openEditModal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  <Settings className="h-3.5 w-3.5" /> 크루 수정
+                </button>
+              )}
               {isOwner ? (
                 <button
                   onClick={handleDeleteCrew}
@@ -561,6 +640,85 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
           member={selectedMember}
           onClose={() => setSelectedMember(null)}
         />
+      )}
+
+      {/* 크루 수정 모달 */}
+      {editModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            {/* 배너 영역 */}
+            <div
+              className="relative h-32 bg-gray-100 cursor-pointer group flex items-center justify-center overflow-hidden"
+              onClick={() => editBannerRef.current?.click()}
+            >
+              {editBannerPreview || crew?.bannerImage ? (
+                <img
+                  src={editBannerPreview ?? (crew?.bannerImage ? `/uploads/${crew.bannerImage.split('/uploads/')[1] ?? crew.bannerImage}` : '')}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-1.5 text-gray-400">
+                  <Camera className="h-6 w-6" />
+                  <span className="text-xs">배너 변경 (선택)</span>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Camera className="h-5 w-5 text-white" />
+              </div>
+              <input ref={editBannerRef} type="file" accept="image/*" className="hidden" onChange={handleEditBanner} />
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900">크루 수정</h3>
+                <button onClick={() => setEditModal(false)} className="h-7 w-7 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <input
+                className="input-field w-full text-sm"
+                placeholder="크루 이름"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+              <textarea
+                className="input-field w-full text-sm resize-none"
+                rows={2}
+                placeholder="크루 소개 (선택)"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+              />
+              {/* 카테고리 */}
+              <div className="flex flex-wrap gap-1.5">
+                {(['Study','Sports','Hobby','Work','Game','Other'] as const).map((c) => {
+                  const labels: Record<string,string> = { Study:'공부', Sports:'스포츠', Hobby:'취미', Work:'업무', Game:'게임', Other:'기타' };
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setEditCategory(c)}
+                      className={`px-3 py-1 rounded-xl text-xs font-medium border transition-all ${
+                        editCategory === c ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {labels[c]}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setEditModal(false)} className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50">취소</button>
+                <button
+                  onClick={handleEditSave}
+                  disabled={editSaving || !editName.trim()}
+                  className="flex-1 py-2.5 rounded-2xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-40 transition-colors"
+                >
+                  {editSaving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 신고 모달 */}

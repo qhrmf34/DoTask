@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const POST_SELECT = {
   id: true,
@@ -17,7 +18,10 @@ const POST_SELECT = {
 
 @Injectable()
 export class PostsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async getByCrewId(crewId: string, cursor?: string) {
     const posts = await this.prisma.post.findMany({
@@ -33,10 +37,30 @@ export class PostsService {
   }
 
   async create(userId: string, crewId: string, content: string, imageUrls: string[] = []) {
-    return this.prisma.post.create({
+    const post = await this.prisma.post.create({
       data: { crewId, userId, content, imageUrls },
-      select: POST_SELECT,
+      select: { ...POST_SELECT, user: { select: { id: true, nickname: true, profileImage: true } } },
     });
+
+    // 크루 멤버들에게 알림 (작성자 제외)
+    const members = await this.prisma.crewMember.findMany({
+      where: { crewId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    const crew = await this.prisma.crew.findUnique({ where: { id: crewId }, select: { name: true } });
+    if (members.length && crew) {
+      await this.notifications.sendMany(
+        members.map((m) => ({
+          userId: m.userId,
+          type: 'NEW_POST',
+          title: `${crew.name} 새 게시글`,
+          body: `${post.user.nickname}: ${content.slice(0, 60)}${content.length > 60 ? '...' : ''}`,
+          data: { crewId, postId: post.id },
+        })),
+      );
+    }
+
+    return post;
   }
 
   async update(userId: string, id: string, content: string) {

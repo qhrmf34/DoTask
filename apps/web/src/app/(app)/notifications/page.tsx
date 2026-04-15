@@ -43,6 +43,7 @@ export default function NotificationsPage() {
   const markAll = async () => {
     await api.patch('/notifications/read-all');
     qc.invalidateQueries({ queryKey: ['notifications'] });
+    qc.invalidateQueries({ queryKey: ['notifications-unread'] });
   };
 
   const markOne = async (id: string) => {
@@ -57,6 +58,7 @@ export default function NotificationsPage() {
         })),
       };
     });
+    qc.invalidateQueries({ queryKey: ['notifications-unread'] });
   };
 
   const hasUnread = notifications.some((n) => !n.isRead);
