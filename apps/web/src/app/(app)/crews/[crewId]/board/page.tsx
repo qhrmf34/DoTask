@@ -5,10 +5,9 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import {
   Plus, ThumbsUp, ThumbsDown, MessageCircle, Pin, MoreHorizontal, Trash2, Flag, X, Send, Image as ImageIcon,
 } from 'lucide-react';
-import { Mascot } from '@/components/ui/Mascot';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
-import { cn, formatDate, resolveUrl } from '@/lib/utils';
+import { cn, formatRelativeTime, resolveUrl } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 
@@ -181,7 +180,7 @@ function PostCard({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-gray-900">{post.user?.nickname}</span>
-                <span className="text-xs text-gray-400">{formatDate(post.createdAt)}</span>
+                <span className="text-xs text-gray-400">{formatRelativeTime(post.createdAt)}</span>
               </div>
               <div className="relative">
                 <button
@@ -294,7 +293,7 @@ function PostCard({
                           <div className="flex items-center justify-between mb-0.5">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold text-gray-800">{c.user?.nickname}</span>
-                              <span className="text-[10px] text-gray-400">{formatDate(c.createdAt)}</span>
+                              <span className="text-[10px] text-gray-400">{formatRelativeTime(c.createdAt)}</span>
                             </div>
                             <div className="flex items-center gap-1 opacity-0 group-hover/comment:opacity-100 transition-opacity">
                               {isMyComment ? (
@@ -501,7 +500,7 @@ export default function BoardPage({ params }: { params: { crewId: string } }) {
         {posts.length === 0 && (
           <div className="py-16 flex flex-col items-center gap-3">
             <div className="mascot-float">
-              <Mascot size={72} variant="sleep" />
+              <img src="/mascot/mascot_waiting.png" alt="" style={{ height: 130, width: 'auto', objectFit: 'contain' }} />
             </div>
             <p className="text-sm font-bold" style={{ color: '#6d28d9' }}>아직 게시글이 없어요</p>
             <p className="text-xs text-gray-400">첫 번째 게시글을 작성해보세요</p>

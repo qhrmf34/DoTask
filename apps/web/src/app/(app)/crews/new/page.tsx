@@ -63,6 +63,7 @@ export default function NewCrewPage() {
 
   const visibility = watch('visibility');
   const category = watch('category');
+  const description = watch('description') ?? '';
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -199,12 +200,18 @@ export default function NewCrewPage() {
                 {...register('name')}
               />
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  소개 <span className="text-gray-400 font-normal text-xs">(선택)</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">
+                    소개 <span className="text-gray-400 font-normal text-xs">(선택)</span>
+                  </label>
+                  <span className={`text-[11px] tabular-nums ${description.length >= 180 ? 'text-red-400' : 'text-gray-300'}`}>
+                    {description.length}/200
+                  </span>
+                </div>
                 <textarea
                   className="input-field resize-none"
                   rows={2}
+                  maxLength={200}
                   placeholder="크루를 소개해주세요"
                   {...register('description')}
                 />

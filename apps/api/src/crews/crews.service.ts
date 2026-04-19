@@ -27,6 +27,11 @@ const CREW_SELECT = {
   rules: true,
   createdAt: true,
   _count: { select: { members: true } },
+  members: {
+    where: { role: 'OWNER' },
+    take: 1,
+    select: { user: { select: { id: true, nickname: true, profileImage: true } } },
+  },
 };
 
 @Injectable()
@@ -107,10 +112,10 @@ export class CrewsService {
 
   async findMyCrews(userId: string) {
     const memberships = await this.prisma.crewMember.findMany({
-      where: { userId },
+      where: { userId, crew: { isDeleted: false } },
       include: { crew: { select: CREW_SELECT } },
     });
-    return memberships.map((m) => m.crew).filter((c) => !(c as any).isDeleted);
+    return memberships.map((m) => m.crew);
   }
 
   async findOne(id: string) {
@@ -226,6 +231,26 @@ export class CrewsService {
       where: { crewId_userId: { crewId, userId: targetUserId } },
       data: { role },
     });
+  }
+
+  async transferOwnership(requesterId: string, crewId: string, targetUserId: string) {
+    await this.assertOwner(requesterId, crewId);
+    const target = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId, userId: targetUserId } },
+    });
+    if (!target) throw new NotFoundException('대상 멤버를 찾을 수 없습니다.');
+    // 기존 오너 → ADMIN, 타겟 → OWNER
+    await this.prisma.$transaction([
+      this.prisma.crewMember.update({
+        where: { crewId_userId: { crewId, userId: requesterId } },
+        data: { role: 'ADMIN' },
+      }),
+      this.prisma.crewMember.update({
+        where: { crewId_userId: { crewId, userId: targetUserId } },
+        data: { role: 'OWNER' },
+      }),
+    ]);
+    return { transferred: true };
   }
 
   async kickMember(requesterId: string, crewId: string, targetUserId: string) {

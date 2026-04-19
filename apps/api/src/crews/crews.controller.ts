@@ -129,4 +129,13 @@ export class CrewsController {
   regenerateInviteCode(@CurrentUser('sub') userId: string, @Param('id') crewId: string) {
     return this.crewsService.regenerateInviteCode(userId, crewId);
   }
+
+  @Patch('crews/:id/transfer/:targetUserId')
+  transferOwnership(
+    @CurrentUser('sub') userId: string,
+    @Param('id') crewId: string,
+    @Param('targetUserId') targetUserId: string,
+  ) {
+    return this.crewsService.transferOwnership(userId, crewId, targetUserId);
+  }
 }

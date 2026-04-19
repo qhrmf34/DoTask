@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
 import { Avatar } from '@/components/ui/avatar';
-import { Mascot } from '@/components/ui/Mascot';
 import { Users, Bell, Settings, Shield, ListTodo, LogOut, ChevronUp } from 'lucide-react';
 
 // NAV_ITEMS는 각 렌더 위치에서 직접 badge prop과 함께 선언
@@ -83,7 +82,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="flex items-center gap-2.5 h-16 px-4" style={{ borderBottom: '1px solid #e8e4f8' }}>
           <div className="shrink-0 hover-wiggle cursor-default">
-            <Mascot size={36} variant="default" />
+            <img src="/mascot/mascot_running.png" alt="DoTask" style={{ height: 44, width: 'auto', objectFit: 'contain' }} />
           </div>
           <div className="hidden lg:block">
             <span className="text-base font-extrabold tracking-tight" style={{ color: '#7c3aed' }}>

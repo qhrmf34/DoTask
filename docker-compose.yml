@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: dotask_dev
       POSTGRES_DB: dotask
     ports:
-      - '5432:5432'
+      - '15432:5432'
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -41,6 +41,7 @@ services:
       DATABASE_URL: postgresql://dotask:dotask_dev@postgres:5432/dotask
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TZ: Asia/Seoul
     ports:
       - '4000:4000'
     depends_on:

@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut, ShieldCheck, ShieldOff, Flag, Copy, Check, Settings, Camera } from 'lucide-react';
+import { Crown, Shield, User, X, ThumbsUp, ThumbsDown, MessageCircle, ChevronLeft, ChevronRight, MoreHorizontal, UserMinus, Trash2, LogOut, ShieldCheck, ShieldOff, Flag, Copy, Check, Settings, Camera, RefreshCw } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
 import { useDialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -320,6 +320,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   const { confirm } = useDialog();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [reportModal, setReportModal] = useState<{ userId: string; nickname: string } | null>(null);
   const [reportReason, setReportReason] = useState('INAPPROPRIATE');
   const [reportDetail, setReportDetail] = useState('');
@@ -374,6 +375,24 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     const order = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
     return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
   });
+
+  const handleTransferOwnership = async (m: Member) => {
+    const ok = await confirm({
+      title: '방장 넘기기',
+      message: `${m.user.nickname}님에게 방장을 넘길까요?\n넘기면 본인은 부방장이 됩니다.`,
+      confirmText: '넘기기',
+      cancelText: '취소',
+      type: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.patch(`/crews/${crewId}/transfer/${m.user.id}`);
+      setMenuOpen(null);
+      refetch();
+    } catch (e: any) {
+      await confirm({ title: '오류', message: e?.response?.data?.message ?? '방장 넘기기에 실패했습니다.', confirmText: '확인', type: 'alert' });
+    }
+  };
 
   const handleSetRole = async (m: Member, role: 'ADMIN' | 'MEMBER') => {
     const label = role === 'ADMIN' ? '부방장' : '일반 멤버';
@@ -471,7 +490,8 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     if (!ok) return;
     try {
       await api.delete(`/crews/${crewId}/leave`);
-      qc.invalidateQueries({ queryKey: ['my-crews'] });
+      qc.removeQueries({ queryKey: ['my-crews'] });
+      qc.removeQueries({ queryKey: ['crew', crewId] });
       router.push('/crews');
     } catch (e: any) {
       await confirm({ title: '오류', message: e?.response?.data?.message ?? '탈퇴에 실패했습니다.', confirmText: '확인', type: 'alert' });
@@ -489,7 +509,9 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     if (!ok) return;
     try {
       await api.delete(`/crews/${crewId}`);
-      qc.invalidateQueries({ queryKey: ['my-crews'] });
+      qc.removeQueries({ queryKey: ['my-crews'] });
+      qc.removeQueries({ queryKey: ['crews'] });
+      qc.removeQueries({ queryKey: ['crew', crewId] });
       router.push('/crews');
     } catch (e: any) {
       await confirm({ title: '오류', message: e?.response?.data?.message ?? '삭제에 실패했습니다.', confirmText: '확인', type: 'alert' });
@@ -500,135 +522,144 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
     <div className="flex flex-1 overflow-hidden">
       {/* Member list */}
       <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
-        <div className="max-w-3xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-bold text-gray-900">멤버</h2>
-              <p className="text-xs text-gray-400 mt-0.5">{members.length}명</p>
-            </div>
-            <div className="flex gap-2 flex-wrap justify-end">
-              {/* 초대링크 복사 - PRIVATE 크루의 방장/부방장만 */}
-              {(isOwner || isAdmin) && crew?.visibility === 'PRIVATE' && (
-                <button
-                  onClick={handleCopyInvite}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
-                >
-                  {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copiedInvite ? '복사됨' : '초대링크'}
-                </button>
-              )}
-              {/* 크루 수정 - 방장/부방장 */}
-              {(isOwner || isAdmin) && (
-                <button
-                  onClick={openEditModal}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  <Settings className="h-3.5 w-3.5" /> 크루 수정
-                </button>
-              )}
-              {isOwner ? (
-                <button
-                  onClick={handleDeleteCrew}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> 크루 삭제
-                </button>
-              ) : myMember ? (
-                <button
-                  onClick={handleLeave}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-                >
-                  <LogOut className="h-3.5 w-3.5" /> 탈퇴
-                </button>
-              ) : null}
-            </div>
-          </div>
+        <div className="max-w-3xl mx-auto px-4 py-5">
+          <div className="bg-white rounded-2xl" style={{ border: '1px solid #e8e8e8' }}>
 
-          <div className="space-y-2">
-            {sorted.map((m) => {
-              const canKick = (isOwner || isAdmin) && m.user.id !== me?.id && m.role !== 'OWNER' && !(isAdmin && m.role === 'ADMIN');
-              const canManageRole = isOwner && m.user.id !== me?.id && m.role !== 'OWNER';
-              const canReport = m.user.id !== me?.id;
-              const hasMenu = canKick || canManageRole || canReport;
-              const isMenuOpen = menuOpen === m.id;
-              const rc = roleConfig[m.role] ?? roleConfig.MEMBER;
-              const isSelected = selectedMember?.id === m.id;
-
-              return (
-                <div
-                  key={m.id}
-                  className={cn(
-                    'card-hover flex items-center transition-all',
-                    isSelected && 'border-primary-200 bg-primary-50/30',
-                  )}
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 rounded-t-2xl" style={{ borderBottom: '1px solid #eeeeee' }}>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">멤버</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{members.length}명</p>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-end items-center">
+                <button
+                  onClick={async () => {
+                    setRefreshing(true);
+                    await refetch();
+                    setTimeout(() => setRefreshing(false), 600);
+                  }}
+                  className="h-7 w-7 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  title="새로고침"
                 >
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+                {myMember && crew?.visibility === 'PRIVATE' && (
                   <button
-                    onClick={() => setSelectedMember(isSelected ? null : m)}
-                    className="flex flex-1 items-center gap-3 px-4 py-3 text-left"
+                    onClick={handleCopyInvite}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
                   >
-                    <Avatar src={m.user.profileImage} fallback={m.user.nickname} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-semibold text-gray-900">{m.user.nickname}</span>
-                        <span className={cn('flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0', rc.bg, rc.text)}>
-                          {rc.icon} {rc.label}
-                        </span>
-                      </div>
-                      {m.user.bio && (
-                        <p className="text-xs text-gray-400 truncate">{m.user.bio}</p>
-                      )}
-                    </div>
+                    {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedInvite ? '복사됨' : '초대링크'}
                   </button>
+                )}
+                {(isOwner || isAdmin) && (
+                  <button
+                    onClick={openEditModal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    <Settings className="h-3.5 w-3.5" /> 크루 수정
+                  </button>
+                )}
+                {isOwner ? (
+                  <button
+                    onClick={handleDeleteCrew}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> 크루 삭제
+                  </button>
+                ) : myMember ? (
+                  <button
+                    onClick={handleLeave}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> 탈퇴
+                  </button>
+                ) : null}
+              </div>
+            </div>
 
-                  {hasMenu && (
-                    <div className="pr-3 relative">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setMenuOpen(isMenuOpen ? null : m.id); }}
-                        className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                      {isMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-100 rounded-xl shadow-lg py-1 min-w-[130px]">
-                          {canManageRole && m.role !== 'ADMIN' && (
-                            <button
-                              onClick={() => handleSetRole(m, 'ADMIN')}
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50"
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5" /> 부방장 임명
-                            </button>
-                          )}
-                          {canManageRole && m.role === 'ADMIN' && (
-                            <button
-                              onClick={() => handleSetRole(m, 'MEMBER')}
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
-                            >
-                              <ShieldOff className="h-3.5 w-3.5" /> 부방장 해제
-                            </button>
-                          )}
-                          {canKick && (
-                            <button
-                              onClick={() => handleKick(m)}
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50"
-                            >
-                              <UserMinus className="h-3.5 w-3.5" /> 강퇴
-                            </button>
-                          )}
-                          {canReport && (
-                            <button
-                              onClick={() => handleReport(m)}
-                              className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 border-t border-gray-50"
-                            >
-                              <Flag className="h-3.5 w-3.5" /> 신고
-                            </button>
-                          )}
+            {/* Member rows */}
+            <div className="divide-y divide-gray-50">
+              {sorted.map((m) => {
+                const canKick = (isOwner || isAdmin) && m.user.id !== me?.id && m.role !== 'OWNER' && !(isAdmin && m.role === 'ADMIN');
+                const canManageRole = isOwner && m.user.id !== me?.id && m.role !== 'OWNER';
+                const canTransfer = isOwner && m.user.id !== me?.id && m.role !== 'OWNER';
+                const canReport = m.user.id !== me?.id;
+                const hasMenu = canKick || canManageRole || canTransfer || canReport;
+                const isMenuOpen = menuOpen === m.id;
+                const rc = roleConfig[m.role] ?? roleConfig.MEMBER;
+                const isSelected = selectedMember?.id === m.id;
+
+                return (
+                  <div
+                    key={m.id}
+                    className={cn(
+                      'flex items-center transition-colors last:rounded-b-2xl',
+                      isSelected ? 'bg-primary-50/40' : 'hover:bg-gray-50',
+                    )}
+                  >
+                    <button
+                      onClick={() => setSelectedMember(isSelected ? null : m)}
+                      className="flex flex-1 items-center gap-3 px-5 py-3.5 text-left"
+                    >
+                      <Avatar src={m.user.profileImage} fallback={m.user.nickname} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm font-semibold text-gray-900">{m.user.nickname}</span>
+                          <span className={cn('flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full shrink-0', rc.bg, rc.text)}>
+                            {rc.icon} {rc.label}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                        {m.user.bio && (
+                          <p className="text-xs text-gray-400 truncate">{m.user.bio}</p>
+                        )}
+                      </div>
+                    </button>
+
+                    {hasMenu && (
+                      <div className="pr-4 relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMenuOpen(isMenuOpen ? null : m.id); }}
+                          className="h-7 w-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-gray-500 hover:bg-gray-100 transition-colors"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                        {isMenuOpen && (
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-100 rounded-xl shadow-lg py-1 min-w-[130px]">
+                            {canManageRole && m.role !== 'ADMIN' && (
+                              <button onClick={() => handleSetRole(m, 'ADMIN')} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50">
+                                <ShieldCheck className="h-3.5 w-3.5" /> 부방장 임명
+                              </button>
+                            )}
+                            {canManageRole && m.role === 'ADMIN' && (
+                              <button onClick={() => handleSetRole(m, 'MEMBER')} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+                                <ShieldOff className="h-3.5 w-3.5" /> 부방장 해제
+                              </button>
+                            )}
+                            {canTransfer && (
+                              <button onClick={() => handleTransferOwnership(m)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-amber-600 hover:bg-amber-50">
+                                <Crown className="h-3.5 w-3.5" /> 방장 넘기기
+                              </button>
+                            )}
+                            {canKick && (
+                              <button onClick={() => handleKick(m)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50">
+                                <UserMinus className="h-3.5 w-3.5" /> 강퇴
+                              </button>
+                            )}
+                            {canReport && (
+                              <button onClick={() => handleReport(m)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 border-t border-gray-50">
+                                <Flag className="h-3.5 w-3.5" /> 신고
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
           </div>
         </div>
       </div>
@@ -681,13 +712,22 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
               />
-              <textarea
-                className="input-field w-full text-sm resize-none"
-                rows={2}
-                placeholder="크루 소개 (선택)"
-                value={editDesc}
-                onChange={(e) => setEditDesc(e.target.value)}
-              />
+              <div className="relative">
+                <textarea
+                  className="input-field w-full text-sm resize-none"
+                  rows={2}
+                  maxLength={200}
+                  placeholder="크루 소개 (선택)"
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                />
+                <span className={cn(
+                  'absolute bottom-2 right-2.5 text-[11px] tabular-nums',
+                  editDesc.length >= 180 ? 'text-red-400' : 'text-gray-300',
+                )}>
+                  {editDesc.length}/200
+                </span>
+              </div>
               {/* 카테고리 */}
               <div className="flex flex-wrap gap-1.5">
                 {(['Study','Sports','Hobby','Work','Game','Other'] as const).map((c) => {

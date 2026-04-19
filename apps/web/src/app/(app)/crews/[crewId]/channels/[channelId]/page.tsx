@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { cn, formatTime, formatFileSize, resolveUrl } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
-import { Mascot } from '@/components/ui/Mascot';
 import { useDialog } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
@@ -255,12 +254,12 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
         {/* Empty state */}
         {isEmpty && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pointer-events-none">
-            <div style={{ animation: 'ghost-pat-arm 2.5s ease-in-out infinite' }}>
-              <Mascot size={88} variant="pat" />
+            <div className="mascot-float">
+              <img src="/mascot/mascot_cheer.png" alt="" style={{ height: 140, width: 'auto', objectFit: 'contain' }} />
             </div>
             <div className="text-center pointer-events-none">
               <p className="text-sm font-bold" style={{ color: '#6d28d9' }}>첫 메시지를 보내보세요</p>
-              <p className="text-xs text-gray-400 mt-0.5">부가 응원하고 있어요</p>
+              <p className="text-xs text-gray-400 mt-0.5">토리가 응원하고 있어요</p>
             </div>
           </div>
         )}
@@ -492,20 +491,12 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
           </div>
         )}
 
-        {/* Cat + pill row */}
+        {/* Input row */}
         {canPost && (
           <div className="flex items-center relative">
-            {/* 고양이 — 입력창 왼쪽에 겹쳐서 위로 솟음 */}
-            <div
-              className="shrink-0 pointer-events-none absolute"
-              style={{ left: '0px', bottom: '18px', zIndex: 10, animation: 'cat-breathe 3.5s ease-in-out infinite' }}
-            >
-              <Mascot size={72} variant="drape" />
-            </div>
-
             {/* Input pill */}
             <div
-              className="flex-1 flex items-center gap-1.5 rounded-3xl pl-14 pr-2 py-1.5 transition-all ml-2"
+              className="flex-1 flex items-center gap-1.5 rounded-3xl px-3 py-1.5 transition-all"
               style={{ background: '#f3f2fe', border: '1.5px solid #ddd6fe', position: 'relative' }}
             >
               {/* Paperclip */}

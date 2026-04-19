@@ -8,7 +8,6 @@ import { Hash, ArrowLeft, ChevronDown, ChevronRight, Play, Pause, Square, Rotate
 import { cn, formatSeconds, resolveUrl } from '@/lib/utils';
 import { useDialog } from '@/components/ui/dialog';
 import { Avatar } from '@/components/ui/avatar';
-import { Mascot } from '@/components/ui/Mascot';
 import { useAuthStore } from '@/store/auth.store';
 import { getSocket } from '@/lib/socket';
 import api from '@/lib/api';

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Play, Pause, RotateCcw, Settings, X } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings, X, Info } from 'lucide-react';
 import { cn, formatSeconds } from '@/lib/utils';
 import { usePomodoroStore } from '@/store/pomodoro.store';
 import api from '@/lib/api';
@@ -87,6 +87,23 @@ export function PomodoroTimer() {
           </button>
         </div>
 
+        {/* 흐름 안내 */}
+        <div className="rounded-xl px-3 py-2.5 mb-4 text-xs text-gray-500 space-y-1" style={{ background: '#f5f3ff' }}>
+          <div className="flex items-center gap-1.5 font-semibold text-primary-600 mb-1.5">
+            <Info className="h-3.5 w-3.5" /> 포모도로 타이머란?
+          </div>
+          <p>짧은 집중과 휴식을 반복해서 생산성을 높이는 기법이에요.</p>
+          <div className="flex items-center gap-1 flex-wrap pt-0.5">
+            <span className="px-2 py-0.5 rounded-full bg-primary-100 text-primary-600 font-medium">집중</span>
+            <span className="text-gray-400">→</span>
+            <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-600 font-medium">짧은 휴식</span>
+            <span className="text-gray-400">×{draft.longBreakInterval}</span>
+            <span className="text-gray-400">→</span>
+            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">긴 휴식</span>
+            <span className="text-gray-400">→ 반복</span>
+          </div>
+        </div>
+
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -123,7 +140,7 @@ export function PomodoroTimer() {
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">긴 휴식 주기</label>
+              <label className="text-xs text-gray-500 block mb-1">긴 휴식 주기 <span className="text-gray-400">(집중 N번)</span></label>
               <input
                 type="number"
                 min={2}
@@ -135,24 +152,30 @@ export function PomodoroTimer() {
             </div>
           </div>
 
-          <div className="space-y-2 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="space-y-2 pt-1 border-t border-gray-100">
+            <label className="flex items-start gap-2 cursor-pointer pt-2">
               <input
                 type="checkbox"
                 checked={draft.autoStartBreak}
                 onChange={(e) => setDraft((d) => ({ ...d, autoStartBreak: e.target.checked }))}
-                className="rounded border-gray-300 text-primary-500 focus:ring-primary-400"
+                className="rounded border-gray-300 text-primary-500 focus:ring-primary-400 mt-0.5"
               />
-              <span className="text-xs text-gray-600">휴식 자동 시작</span>
+              <div>
+                <span className="text-xs font-medium text-gray-700 block">휴식 자동 시작</span>
+                <span className="text-[11px] text-gray-400">집중이 끝나면 버튼 없이 바로 휴식 시작</span>
+              </div>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={draft.autoStartWork}
                 onChange={(e) => setDraft((d) => ({ ...d, autoStartWork: e.target.checked }))}
-                className="rounded border-gray-300 text-primary-500 focus:ring-primary-400"
+                className="rounded border-gray-300 text-primary-500 focus:ring-primary-400 mt-0.5"
               />
-              <span className="text-xs text-gray-600">집중 자동 시작</span>
+              <div>
+                <span className="text-xs font-medium text-gray-700 block">집중 자동 시작</span>
+                <span className="text-[11px] text-gray-400">휴식이 끝나면 버튼 없이 바로 집중 시작</span>
+              </div>
             </label>
           </div>
         </div>

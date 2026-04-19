@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Check, Trash2, ChevronDown, Sparkles, ThumbsUp, ThumbsDown, MessageCircle, Send, X, Flag } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Mascot } from '@/components/ui/Mascot';
+import { cn, formatRelativeTime } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
@@ -220,7 +219,7 @@ export function TodoList({ todos, onRefetch, date }: Props) {
       {todos.length === 0 && !adding && (
         <div className="card py-12 text-center flex flex-col items-center gap-2">
           <div className="mascot-float">
-            <Mascot size={72} variant="sleep" />
+            <img src="/mascot/mascot_waiting.png" alt="" style={{ height: 130, width: 'auto', objectFit: 'contain' }} />
           </div>
           <p className="text-sm font-bold mt-1" style={{ color: '#6d28d9' }}>오늘은 할일이 없어요!</p>
           <p className="text-xs text-gray-400">토리가 기다리고 있어요</p>
@@ -231,7 +230,7 @@ export function TodoList({ todos, onRefetch, date }: Props) {
       {todos.length > 0 && pending.length === 0 && (
         <div className="card py-8 text-center flex flex-col items-center gap-1.5">
           <div className="hover-wiggle">
-            <Mascot size={56} variant="happy" />
+            <img src="/mascot/mascot_happy.png" alt="" style={{ height: 130, width: 'auto', objectFit: 'contain' }} />
           </div>
           <p className="text-sm font-bold" style={{ color: '#6d28d9' }}>모든 할일 완료!</p>
           <p className="text-xs text-gray-400">토리가 기뻐하고 있어요</p>
@@ -487,7 +486,10 @@ function TodoItem({ todo, onToggle, onDelete, onRefetch }: {
                     <Avatar src={c.user?.profileImage} fallback={c.user?.nickname ?? '?'} size="xs" />
                     <div className="flex-1 bg-gray-50 rounded-xl px-2.5 py-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-700">{c.user?.nickname}</span>
+                          {c.createdAt && <span className="text-[10px] text-gray-400">{formatRelativeTime(c.createdAt)}</span>}
+                        </div>
                         <div className="flex items-center gap-0.5 opacity-0 group-hover/cmt:opacity-100 transition-opacity">
                           {isMyComment ? (
                             <button

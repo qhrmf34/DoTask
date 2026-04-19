@@ -8,7 +8,7 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.amazonaws.com' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'k.kakaocdn.net' },
-      // 👇 여기에 에러가 났던 호스트 정보를 추가합니다.
+      //  여기에 에러가 났던 호스트 정보를 추가합니다.
       {
         protocol: 'http',
         hostname: '220.76.86.151',

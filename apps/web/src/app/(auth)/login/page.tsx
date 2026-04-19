@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,6 +21,8 @@ type FormData = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get('redirect') ?? '/todos';
   const setUser = useAuthStore((s) => s.setUser);
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
   const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
@@ -41,7 +43,7 @@ export default function LoginPage() {
       if (res.data.refreshToken) setRefreshToken(res.data.refreshToken);
       const me = await api.get('/users/me');
       setUser(me.data);
-      router.push('/todos');
+      router.push(redirectTo);
     } catch {
       setError('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
