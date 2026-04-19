@@ -60,7 +60,7 @@ export class CrewsService {
     const member = await this.prisma.crewMember.findUnique({
       where: { crewId_userId: { crewId, userId: requesterId } },
     });
-    if (!member) throw new Error('크루 멤버만 볼 수 있습니다.');
+    if (!member) throw new ForbiddenException('크루 멤버만 볼 수 있습니다.');
 
     const start = new Date(date);
     start.setHours(0, 0, 0, 0);
@@ -119,8 +119,8 @@ export class CrewsService {
   }
 
   async findOne(id: string) {
-    const crew = await this.prisma.crew.findUnique({ where: { id }, select: CREW_SELECT });
-    if (!crew || (crew as any).isDeleted) throw new NotFoundException();
+    const crew = await this.prisma.crew.findUnique({ where: { id, isDeleted: false }, select: CREW_SELECT });
+    if (!crew) throw new NotFoundException();
     return crew;
   }
 
@@ -176,9 +176,6 @@ export class CrewsService {
     });
     if (existing) throw new ConflictException('이미 가입된 크루입니다.');
 
-    const count = await this.prisma.crewMember.count({ where: { crewId } });
-    if (count >= crew.maxMembers) throw new BadRequestException('크루 정원이 꽉 찼습니다.');
-
     if (crew.visibility === 'PRIVATE') throw new ForbiddenException('초대 링크로만 가입할 수 있습니다.');
     if (crew.visibility === 'PASSWORD') {
       if (!password || !crew.passwordHash) throw new BadRequestException('비밀번호가 필요합니다.');
@@ -186,7 +183,11 @@ export class CrewsService {
       if (!valid) throw new ForbiddenException('비밀번호가 올바르지 않습니다.');
     }
 
-    const member = await this.prisma.crewMember.create({ data: { crewId, userId } });
+    const member = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.crewMember.count({ where: { crewId } });
+      if (count >= crew.maxMembers) throw new BadRequestException('크루 정원이 꽉 찼습니다.');
+      return tx.crewMember.create({ data: { crewId, userId } });
+    });
     this.sendJoinSystemMessage(crewId, userId);
     return member;
   }
@@ -200,10 +201,11 @@ export class CrewsService {
     });
     if (existing) throw new ConflictException('이미 가입된 크루입니다.');
 
-    const count = await this.prisma.crewMember.count({ where: { crewId: crew.id } });
-    if (count >= crew.maxMembers) throw new BadRequestException('크루 정원이 꽉 찼습니다.');
-
-    const member = await this.prisma.crewMember.create({ data: { crewId: crew.id, userId } });
+    const member = await this.prisma.$transaction(async (tx) => {
+      const count = await tx.crewMember.count({ where: { crewId: crew.id } });
+      if (count >= crew.maxMembers) throw new BadRequestException('크루 정원이 꽉 찼습니다.');
+      return tx.crewMember.create({ data: { crewId: crew.id, userId } });
+    });
     this.sendJoinSystemMessage(crew.id, userId);
     return member;
   }
@@ -217,7 +219,11 @@ export class CrewsService {
     return this.prisma.crewMember.delete({ where: { crewId_userId: { crewId, userId } } });
   }
 
-  async getMembers(crewId: string) {
+  async getMembers(requesterId: string, crewId: string) {
+    const membership = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId, userId: requesterId } },
+    });
+    if (!membership) throw new ForbiddenException('크루 멤버만 볼 수 있습니다.');
     return this.prisma.crewMember.findMany({
       where: { crewId },
       include: { user: { select: { id: true, nickname: true, profileImage: true } } },

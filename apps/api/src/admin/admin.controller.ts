@@ -123,7 +123,7 @@ export class AdminController {
   }
 
   @Post('reports/:id/notify')
-  notifyReporter(@Param('id') reportId: string) {
-    return this.service.notifyReporter(reportId);
+  notifyReporter(@Param('id') reportId: string, @Body('message') message?: string) {
+    return this.service.notifyReporter(reportId, message);
   }
 }

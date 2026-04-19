@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const CMT_SELECT = {
   id: true, userId: true, targetType: true, todoId: true, postId: true,
@@ -10,29 +11,50 @@ const CMT_SELECT = {
 
 @Injectable()
 export class CommentsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(CommentsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   getTodoComments(todoId: string) {
     return this.prisma.comment.findMany({
-      where: { todoId, parentId: null },
-      select: { ...CMT_SELECT, replies: { select: CMT_SELECT, orderBy: { createdAt: 'asc' } } },
+      where: { todoId, parentId: null, isDeleted: false },
+      select: { ...CMT_SELECT, replies: { where: { isDeleted: false }, select: CMT_SELECT, orderBy: { createdAt: 'asc' } } },
       orderBy: { createdAt: 'asc' },
     });
   }
 
   getPostComments(postId: string) {
     return this.prisma.comment.findMany({
-      where: { postId, parentId: null },
-      select: { ...CMT_SELECT, replies: { select: CMT_SELECT, orderBy: { createdAt: 'asc' } } },
+      where: { postId, parentId: null, isDeleted: false },
+      select: { ...CMT_SELECT, replies: { where: { isDeleted: false }, select: CMT_SELECT, orderBy: { createdAt: 'asc' } } },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  createForTodo(userId: string, todoId: string, content: string, parentId?: string) {
-    return this.prisma.comment.create({
+  async createForTodo(userId: string, todoId: string, content: string, parentId?: string) {
+    const comment = await this.prisma.comment.create({
       data: { userId, targetType: 'TODO', todoId, parentId, content },
-      select: CMT_SELECT,
+      select: { ...CMT_SELECT, user: { select: { id: true, nickname: true, profileImage: true } } },
     });
+
+    try {
+      const todo = await this.prisma.todo.findUnique({ where: { id: todoId }, select: { userId: true, title: true } });
+      if (todo && todo.userId !== userId) {
+        await this.notifications.send({
+          userId: todo.userId,
+          type: 'TODO_COMMENT',
+          title: `${comment.user.nickname}님이 댓글을 달았어요`,
+          body: `"${todo.title.slice(0, 30)}": ${content.slice(0, 40)}`,
+        });
+      }
+    } catch (e) {
+      this.logger.error('Failed to send TODO_COMMENT notification', e);
+    }
+
+    return comment;
   }
 
   createForPost(userId: string, postId: string, content: string, parentId?: string) {
@@ -49,10 +71,22 @@ export class CommentsService {
     return this.prisma.comment.update({ where: { id }, data: { content }, select: CMT_SELECT });
   }
 
-  async remove(userId: string, id: string, role: string) {
+  async remove(userId: string, id: string) {
     const c = await this.prisma.comment.findUnique({ where: { id } });
     if (!c) throw new NotFoundException();
-    if (c.userId !== userId && role !== 'ADMIN') throw new ForbiddenException();
+    if (c.userId !== userId) {
+      // 게시글 댓글이면 크루 어드민 권한 확인
+      if (c.postId) {
+        const post = await this.prisma.post.findUnique({ where: { id: c.postId }, select: { crewId: true } });
+        if (!post) throw new ForbiddenException();
+        const m = await this.prisma.crewMember.findUnique({
+          where: { crewId_userId: { crewId: post.crewId, userId } },
+        });
+        if (!m || !['OWNER', 'ADMIN'].includes(m.role)) throw new ForbiddenException();
+      } else {
+        throw new ForbiddenException();
+      }
+    }
     return this.prisma.comment.update({ where: { id }, data: { isDeleted: true, content: '삭제된 댓글입니다.' } });
   }
 

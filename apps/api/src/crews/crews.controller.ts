@@ -92,8 +92,8 @@ export class CrewsController {
   }
 
   @Get('crews/:id/members')
-  getMembers(@Param('id') crewId: string) {
-    return this.crewsService.getMembers(crewId);
+  getMembers(@CurrentUser('sub') userId: string, @Param('id') crewId: string) {
+    return this.crewsService.getMembers(userId, crewId);
   }
 
   @Get('crews/:crewId/members/:userId/todos')

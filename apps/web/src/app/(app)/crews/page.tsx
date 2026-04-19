@@ -368,6 +368,7 @@ function RecentNotificationsPanel() {
 }
 
 function TodayTodosPanel() {
+  const qc = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
   const { data: todos = [] } = useQuery<any[]>({
     queryKey: ['todos', today],
@@ -377,6 +378,21 @@ function TodayTodosPanel() {
   const done = todos.filter((t) => t.isCompleted).length;
   const total = todos.length;
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  const toggleTodo = async (id: string) => {
+    qc.setQueryData(['todos', today], (prev: any[]) =>
+      (prev ?? []).map((t) => t.id === id ? { ...t, isCompleted: !t.isCompleted } : t),
+    );
+    try {
+      await api.patch(`/todos/${id}/complete`);
+      const year = new Date().getFullYear();
+      const month = new Date().getMonth() + 1;
+      qc.invalidateQueries({ queryKey: ['calendar', year, month] });
+      qc.invalidateQueries({ queryKey: ['todos-monthly-stats', year, month] });
+    } catch {
+      qc.invalidateQueries({ queryKey: ['todos', today] });
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
@@ -413,7 +429,11 @@ function TodayTodosPanel() {
         ) : (
           <div className="space-y-1.5">
             {todos.slice(0, 5).map((t) => (
-              <div key={t.id} className="flex items-center gap-2.5 px-1">
+              <button
+                key={t.id}
+                onClick={() => toggleTodo(t.id)}
+                className="w-full flex items-center gap-2.5 px-1 py-0.5 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
                 {t.isCompleted
                   ? <CheckSquare className="h-4 w-4 text-mint-500 shrink-0" />
                   : <Square className="h-4 w-4 text-gray-300 shrink-0" />
@@ -421,7 +441,7 @@ function TodayTodosPanel() {
                 <span className={cn('text-xs truncate', t.isCompleted ? 'line-through text-gray-400' : 'text-gray-700')}>
                   {t.title}
                 </span>
-              </div>
+              </button>
             ))}
             {todos.length > 5 && (
               <p className="text-[11px] text-gray-400 pl-1 pt-1">+{todos.length - 5}개 더</p>

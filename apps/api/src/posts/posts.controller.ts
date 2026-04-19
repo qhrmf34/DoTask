@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
-  UseGuards, UseInterceptors, UploadedFiles,
+  UseGuards, UseInterceptors, UploadedFiles, ParseFilePipe, FileTypeValidator, MaxFileSizeValidator,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { PostsService } from './posts.service';
@@ -17,8 +17,12 @@ export class PostsController {
   ) {}
 
   @Get('crews/:crewId/posts')
-  getByCrewId(@Param('crewId') crewId: string, @Query('cursor') cursor?: string) {
-    return this.postsService.getByCrewId(crewId, cursor);
+  getByCrewId(
+    @CurrentUser('sub') userId: string,
+    @Param('crewId') crewId: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.postsService.getByCrewId(userId, crewId, cursor);
   }
 
   @Post('crews/:crewId/posts')
@@ -27,7 +31,13 @@ export class PostsController {
     @CurrentUser('sub') userId: string,
     @Param('crewId') crewId: string,
     @Body('content') content: string,
-    @UploadedFiles() files?: Express.Multer.File[],
+    @UploadedFiles(new ParseFilePipe({
+      validators: [
+        new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // 10MB
+        new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+      ],
+      fileIsRequired: false,
+    })) files?: Express.Multer.File[],
   ) {
     const imageUrls = files
       ? await Promise.all(files.map((f) => this.uploadService.uploadFile(f, 'posts')))
@@ -47,10 +57,9 @@ export class PostsController {
   @Delete('posts/:id')
   remove(
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') role: string,
     @Param('id') id: string,
   ) {
-    return this.postsService.remove(userId, id, role);
+    return this.postsService.remove(userId, id);
   }
 
   @Patch('posts/:id/pin')

@@ -230,20 +230,21 @@ export class AdminService {
     return this.prisma.report.update({ where: { id: reportId }, data: { status } });
   }
 
-  async notifyReporter(reportId: string) {
+  async notifyReporter(reportId: string, customMessage?: string) {
     const report = await this.prisma.report.findUnique({
       where: { id: reportId },
       select: { reporterId: true, status: true },
     });
     if (!report) throw new NotFoundException();
-    const message = report.status === 'REVIEWED'
-      ? '신고하신 내용이 검토되어 처리되었습니다.'
-      : '신고하신 내용을 검토하였으나 처리 기준에 해당하지 않아 처리되지 않았습니다.';
+    const body = customMessage?.trim()
+      || (report.status === 'REVIEWED'
+        ? '신고하신 내용이 검토되어 처리되었습니다.'
+        : '신고하신 내용을 검토하였으나 처리 기준에 해당하지 않아 처리되지 않았습니다.');
     await this.notifications.send({
       userId: report.reporterId,
       type: 'REPORT_PROCESSED',
-      title: '신고 처리 완료',
-      body: message,
+      title: '[관리자] 신고 처리 안내',
+      body,
     });
     return { sent: true };
   }

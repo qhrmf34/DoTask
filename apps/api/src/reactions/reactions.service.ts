@@ -1,12 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type TargetType = 'TODO' | 'POST' | 'COMMENT';
 type ReactionType = 'LIKE' | 'DISLIKE';
 
 @Injectable()
 export class ReactionsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ReactionsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   /** 반응 토글: 같은 타입이면 취소, 다른 타입이면 교체 */
   async toggle(
@@ -32,6 +38,25 @@ export class ReactionsService {
     await this.prisma.reaction.create({
       data: { userId, targetType, type, ...this.buildField(targetType, targetId) },
     });
+
+    // 할일 좋아요 알림
+    if (targetType === 'TODO' && type === 'LIKE') {
+      try {
+        const todo = await this.prisma.todo.findUnique({ where: { id: targetId }, select: { userId: true, title: true } });
+        const reactor = await this.prisma.user.findUnique({ where: { id: userId }, select: { nickname: true } });
+        if (todo && reactor && todo.userId !== userId) {
+          await this.notifications.send({
+            userId: todo.userId,
+            type: 'TODO_REACTION',
+            title: `${reactor.nickname}님이 좋아요를 눌렀어요`,
+            body: `"${todo.title.slice(0, 30)}"에 좋아요를 남겼습니다.`,
+          });
+        }
+      } catch (e) {
+        this.logger.error('Failed to send TODO_REACTION notification', e);
+      }
+    }
+
     return { action: 'added', type };
   }
 

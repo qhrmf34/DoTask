@@ -18,14 +18,19 @@ async function bootstrap() {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+  }));
   app.use(cookieParser());
 
   const isDev = process.env.NODE_ENV !== 'production';
+  const allowedOrigins = isDev
+    ? ['http://localhost:3000', 'http://localhost:3001']
+    : (process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []);
+
   app.enableCors({
-    origin: isDev
-      ? true  // 개발환경: 모든 origin 허용
-      : (process.env.FRONTEND_URL || 'http://localhost:3000'),
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

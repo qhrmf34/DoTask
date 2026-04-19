@@ -9,8 +9,8 @@ export class ChannelsController {
   constructor(private service: ChannelsService) {}
 
   @Get('crews/:crewId/channels')
-  getByCrewId(@Param('crewId') crewId: string) {
-    return this.service.getByCrewId(crewId);
+  getByCrewId(@CurrentUser('sub') userId: string, @Param('crewId') crewId: string) {
+    return this.service.getByCrewId(userId, crewId);
   }
 
   @Post('crews/:crewId/channels')

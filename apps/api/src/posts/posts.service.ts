@@ -23,7 +23,11 @@ export class PostsService {
     private notifications: NotificationsService,
   ) {}
 
-  async getByCrewId(crewId: string, cursor?: string) {
+  async getByCrewId(userId: string, crewId: string, cursor?: string) {
+    const membership = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId, userId } },
+    });
+    if (!membership) throw new ForbiddenException('크루 멤버만 볼 수 있습니다.');
     const posts = await this.prisma.post.findMany({
       where: { crewId, isDeleted: false },
       select: POST_SELECT,
@@ -37,6 +41,10 @@ export class PostsService {
   }
 
   async create(userId: string, crewId: string, content: string, imageUrls: string[] = []) {
+    const membership = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId, userId } },
+    });
+    if (!membership) throw new ForbiddenException('크루 멤버만 게시글을 작성할 수 있습니다.');
     const post = await this.prisma.post.create({
       data: { crewId, userId, content, imageUrls },
       select: { ...POST_SELECT, user: { select: { id: true, nickname: true, profileImage: true } } },
@@ -70,10 +78,12 @@ export class PostsService {
     return this.prisma.post.update({ where: { id }, data: { content }, select: POST_SELECT });
   }
 
-  async remove(userId: string, id: string, role: string) {
+  async remove(userId: string, id: string) {
     const post = await this.prisma.post.findUnique({ where: { id } });
     if (!post) throw new NotFoundException();
-    if (post.userId !== userId && role !== 'ADMIN') throw new ForbiddenException();
+    if (post.userId !== userId) {
+      await this.assertCrewAdmin(userId, post.crewId);
+    }
     return this.prisma.post.update({ where: { id }, data: { isDeleted: true } });
   }
 

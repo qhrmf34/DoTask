@@ -290,9 +290,18 @@ export default function AdminPage() {
     qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
   };
 
-  const notifyReporter = async (id: string) => {
-    await api.post(`/admin/reports/${id}/notify`);
-    alert('신고자에게 알림을 전송했습니다.');
+  const [notifyModal, setNotifyModal] = useState<{ reportId: string } | null>(null);
+  const [notifyMessage, setNotifyMessage] = useState('');
+
+  const openNotifyModal = (id: string) => {
+    setNotifyMessage('');
+    setNotifyModal({ reportId: id });
+  };
+
+  const sendNotify = async () => {
+    if (!notifyModal || !notifyMessage.trim()) return;
+    await api.post(`/admin/reports/${notifyModal.reportId}/notify`, { message: notifyMessage.trim() });
+    setNotifyModal(null);
   };
 
   const deactivateUserFromReport = async (userId: string, reportId: string) => {
@@ -622,10 +631,10 @@ export default function AdminPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => notifyReporter(r.id)}
+                        onClick={() => openNotifyModal(r.id)}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
                       >
-                        <Bell className="h-3.5 w-3.5" /> 신고자에게 알림
+                        <Bell className="h-3.5 w-3.5" /> 신고자에게 쪽지
                       </button>
                       <div className="flex gap-1.5 ml-auto">
                         <button
@@ -658,6 +667,39 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* 쪽지 모달 */}
+      {notifyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-900">신고자에게 쪽지 보내기</h3>
+              <button onClick={() => setNotifyModal(null)} className="h-7 w-7 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-400">작성한 메시지가 신고자의 알림함으로 전달됩니다.</p>
+            <textarea
+              className="input-field resize-none w-full"
+              rows={4}
+              placeholder="신고자에게 전달할 메시지를 입력하세요"
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setNotifyModal(null)} className="flex-1 py-2.5 rounded-2xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50">취소</button>
+              <button
+                onClick={sendNotify}
+                disabled={!notifyMessage.trim()}
+                className="flex-1 py-2.5 rounded-2xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 disabled:opacity-40 transition-colors"
+              >
+                전송
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

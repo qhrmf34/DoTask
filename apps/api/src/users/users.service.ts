@@ -52,33 +52,42 @@ export class UsersService {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0);
 
-    const [totalCompleted, monthTodos, crewCount] = await Promise.all([
+    const [totalCompleted, monthTodos, crewCount, recentCompleted] = await Promise.all([
       this.prisma.todo.count({ where: { userId, isCompleted: true } }),
       this.prisma.todo.findMany({
         where: { userId, dueDate: { gte: firstOfMonth, lte: lastOfMonth } },
         select: { isCompleted: true },
       }),
       this.prisma.crewMember.count({ where: { userId } }),
+      this.prisma.todo.findMany({
+        where: { userId, isCompleted: true, completedAt: { gte: oneYearAgo } },
+        select: { completedAt: true },
+        orderBy: { completedAt: 'desc' },
+      }),
     ]);
 
     const monthTotal = monthTodos.length;
     const monthDone = monthTodos.filter((t) => t.isCompleted).length;
     const monthPct = monthTotal === 0 ? 0 : Math.round((monthDone / monthTotal) * 100);
 
-    // Simple streak: consecutive days with at least one completed todo (going backwards from today)
+    // 완료된 날짜 Set으로 스트릭 계산 (DB 쿼리 1회)
+    const completedDateSet = new Set(
+      recentCompleted
+        .filter((t) => t.completedAt)
+        .map((t) => {
+          const d = new Date(t.completedAt!);
+          return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+        }),
+    );
     let streak = 0;
-    const checkDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     for (let i = 0; i < 365; i++) {
-      const start = new Date(checkDate);
-      start.setDate(start.getDate() - i);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setHours(23, 59, 59, 999);
-      const count = await this.prisma.todo.count({
-        where: { userId, isCompleted: true, completedAt: { gte: start, lte: end } },
-      });
-      if (count > 0) streak++;
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (completedDateSet.has(key)) streak++;
       else break;
     }
 

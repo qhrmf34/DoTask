@@ -1,6 +1,7 @@
 import {
   Controller, Post, Get, Body, Req, Res, UseGuards, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
@@ -12,6 +13,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Public()
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
   @Post('register')
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: any) {
     const { accessToken, refreshToken } = await this.authService.register(dto);
@@ -20,6 +22,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -69,7 +72,7 @@ export class AuthController {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth/refresh',
+      path: '/',
     });
   }
 }

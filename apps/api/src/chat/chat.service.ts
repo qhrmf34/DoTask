@@ -22,7 +22,21 @@ const MESSAGE_SELECT = {
 export class ChatService {
   constructor(private prisma: PrismaService) {}
 
-  async getMessages(channelId: string, cursor?: string, take = 50) {
+  async verifyChannelAccess(userId: string, channelId: string): Promise<string> {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { crewId: true },
+    });
+    if (!channel) throw new NotFoundException('채널을 찾을 수 없습니다.');
+    const membership = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId: channel.crewId, userId } },
+    });
+    if (!membership) throw new ForbiddenException();
+    return channel.crewId;
+  }
+
+  async getMessages(userId: string, channelId: string, cursor?: string, take = 50) {
+    await this.verifyChannelAccess(userId, channelId);
     const messages = await this.prisma.message.findMany({
       where: { channelId },
       select: MESSAGE_SELECT,
@@ -51,6 +65,7 @@ export class ChatService {
     fileMimeType?: string;
     metadata?: any;
   }) {
+    await this.verifyChannelAccess(data.userId, data.channelId);
     return this.prisma.message.create({
       data: {
         channelId: data.channelId,

@@ -48,10 +48,9 @@ export class CommentsController {
   @Delete('comments/:id')
   remove(
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') role: string,
     @Param('id') id: string,
   ) {
-    return this.service.remove(userId, id, role);
+    return this.service.remove(userId, id);
   }
 
   @Post('comments/:id/report')

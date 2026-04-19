@@ -13,10 +13,11 @@ export class ChatController {
   /** 채널 메시지 목록 (커서 페이지네이션) */
   @Get('channels/:channelId/messages')
   getMessages(
+    @CurrentUser('sub') userId: string,
     @Param('channelId') channelId: string,
     @Query('cursor') cursor?: string,
   ) {
-    return this.chatService.getMessages(channelId, cursor);
+    return this.chatService.getMessages(userId, channelId, cursor);
   }
 
   /** 메시지 수정 */

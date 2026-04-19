@@ -31,6 +31,6 @@ export const useAuthStore = create<AuthState>()(
       setRefreshToken: (refreshToken) => set({ refreshToken }),
       logout: () => set({ user: null, accessToken: null, refreshToken: null }),
     }),
-    { name: 'dotask-auth', partialize: (s) => ({ user: s.user, accessToken: s.accessToken, refreshToken: s.refreshToken }) },
+    { name: 'dotask-auth', partialize: (s) => ({ user: s.user, accessToken: s.accessToken }) },
   ),
 );

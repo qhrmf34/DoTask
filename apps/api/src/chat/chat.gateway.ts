@@ -48,9 +48,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('chat:join')
-  handleJoinChannel(@ConnectedSocket() client: Socket, @MessageBody() data: { channelId: string } | string) {
+  async handleJoinChannel(@ConnectedSocket() client: Socket, @MessageBody() data: { channelId: string } | string) {
     const channelId = typeof data === 'string' ? data : data?.channelId;
-    if (channelId) client.join(`channel:${channelId}`);
+    if (!channelId) return;
+    const userId = client.data.user?.sub;
+    if (!userId) return;
+    try {
+      await this.chatService.verifyChannelAccess(userId, channelId);
+      client.join(`channel:${channelId}`);
+    } catch {
+      // 멤버가 아닌 경우 채널 입장 거부
+    }
   }
 
   @SubscribeMessage('chat:leave')

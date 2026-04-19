@@ -5,7 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ChannelsService {
   constructor(private prisma: PrismaService) {}
 
-  async getByCrewId(crewId: string) {
+  async getByCrewId(userId: string, crewId: string) {
+    const membership = await this.prisma.crewMember.findUnique({
+      where: { crewId_userId: { crewId, userId } },
+    });
+    if (!membership) throw new ForbiddenException();
     const channels = await this.prisma.channel.findMany({
       where: { crewId },
       orderBy: { order: 'asc' },
