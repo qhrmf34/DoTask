@@ -333,7 +333,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                       <div className="relative">
                         <button
                           onClick={() => setMenuOpen(menuOpen === msg.id ? null : msg.id)}
-                          className="h-7 w-7 rounded-full flex items-center justify-center text-gray-300 hover:text-primary-500 hover:bg-white shadow-sm transition-colors"
+                          className="h-7 w-7 rounded-full flex items-center justify-center text-gray-300 hover:text-violet-500 hover:bg-white shadow-sm transition-colors"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </button>
@@ -345,7 +345,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                             {msg.type === 'TEXT' && (
                               <button
                                 onClick={() => { setEditingId(msg.id); setEditContent(msg.content); setMenuOpen(null); }}
-                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-primary-50 rounded-t-2xl"
+                                className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-violet-50 rounded-t-2xl"
                               >
                                 <Pencil className="h-3.5 w-3.5" /> 수정
                               </button>
@@ -425,7 +425,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                       <div className="relative">
                         <button
                           onClick={() => setMenuOpen(menuOpen === msg.id ? null : msg.id)}
-                          className="h-7 w-7 rounded-full flex items-center justify-center text-gray-300 hover:text-primary-500 hover:bg-white shadow-sm transition-colors"
+                          className="h-7 w-7 rounded-full flex items-center justify-center text-gray-300 hover:text-violet-500 hover:bg-white shadow-sm transition-colors"
                         >
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </button>
@@ -434,7 +434,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                             className="absolute top-full left-0 z-20 mt-1 bg-white rounded-2xl shadow-soft py-1 min-w-[120px]"
                             style={{ border: '1px solid #e8e4f8' }}
                           >
-                            <button onClick={() => handleReport(msg.id)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-primary-50">
+                            <button onClick={() => handleReport(msg.id)} className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-violet-50">
                               <Flag className="h-3.5 w-3.5" /> 신고
                             </button>
                           </div>
@@ -551,7 +551,7 @@ export default function ChannelPage({ params }: { params: { crewId: string; chan
                   className={cn(
                     'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors border',
                     reportReason === r.value
-                      ? 'bg-primary-50 border-primary-300 text-primary-700'
+                      ? 'bg-violet-50 border-primary-300 text-primary-700'
                       : 'border-gray-100 text-gray-600 hover:bg-gray-50',
                   )}
                 >

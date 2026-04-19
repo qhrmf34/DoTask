@@ -156,7 +156,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 flex z-40 safe-area-pb"
-        style={{ background: 'white', borderTop: '1.5px solid #ede9fe' }}>
+        style={{ background: 'white', borderTop: '1.5px solid #ddd6fe' }}>
         {[
           { href: '/todos', icon: ListTodo, label: '할일' },
           { href: '/crews', icon: Users, label: '크루' },

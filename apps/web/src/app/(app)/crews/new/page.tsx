@@ -231,7 +231,7 @@ export default function NewCrewPage() {
                   className={cn(
                     'px-3 py-1.5 rounded-xl text-sm border transition-all font-medium',
                     category === c
-                      ? 'bg-primary-500 text-white border-primary-500'
+                      ? 'bg-gray-500 text-white border-primary-500'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white',
                   )}
                 >
@@ -254,7 +254,7 @@ export default function NewCrewPage() {
                   className={cn(
                     'flex flex-col items-center gap-1.5 py-3 rounded-xl border text-center transition-all',
                     visibility === value
-                      ? 'bg-primary-500 text-white border-primary-500'
+                      ? 'bg-gray-500 text-white border-primary-500'
                       : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white',
                   )}
                 >

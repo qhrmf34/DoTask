@@ -121,7 +121,7 @@ export default function NotificationsPage() {
             <div>
               <h1 className="text-xl font-bold text-gray-900">알림</h1>
               {unreadCount > 0 && (
-                <p className="text-xs text-gray-400 mt-0.5">읽지 않은 알림 <span className="text-primary-500 font-semibold">{unreadCount}개</span></p>
+                <p className="text-xs text-gray-400 mt-0.5">읽지 않은 알림 <span className="text-violet-500 font-semibold">{unreadCount}개</span></p>
               )}
             </div>
             {hasUnread && (
@@ -158,7 +158,7 @@ export default function NotificationsPage() {
                           onClick={() => handleClick(n)}
                           className={cn(
                             'flex items-start gap-3.5 px-5 py-4 transition-colors',
-                            !n.isRead && 'bg-primary-50/30',
+                            !n.isRead && 'bg-violet-50/30',
                             (isClickable || !n.isRead) && 'cursor-pointer hover:bg-gray-50',
                           )}
                         >
@@ -179,7 +179,7 @@ export default function NotificationsPage() {
                                 </p>
                               </div>
                               {!n.isRead && (
-                                <div className="h-2 w-2 rounded-full bg-primary-500 shrink-0 mt-1.5" />
+                                <div className="h-2 w-2 rounded-full bg-violet-500 shrink-0 mt-1.5" />
                               )}
                             </div>
                             <p className="text-sm text-gray-500 mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>

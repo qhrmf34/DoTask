@@ -78,7 +78,7 @@ export default function InvitePage({ params }: { params: { code: string } }) {
 
   return (
     <div className="flex-1 flex items-center justify-center px-4 py-8" style={{ background: '#f7f8fa' }}>
-      <div className="bg-white rounded-3xl shadow-lg w-full max-w-sm overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
+      <div className="bg-white rounded-3xl shadow-lg w-full max-w-sm overflow-hidden" style={{ border: '1px solid #ddd6fe' }}>
 
         {/* 배너 */}
         <div className="relative h-40 overflow-hidden"

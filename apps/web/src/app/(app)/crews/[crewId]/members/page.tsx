@@ -52,7 +52,7 @@ function TodoRow({
       <div className="flex items-start gap-2.5">
         <div className={cn(
           'mt-0.5 h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all',
-          todo.isCompleted ? 'bg-primary-500 border-primary-500' : 'border-gray-300',
+          todo.isCompleted ? 'bg-violet-500 border-primary-500' : 'border-gray-300',
         )}>
           {todo.isCompleted && <span className="text-white text-[8px] font-bold">✓</span>}
         </div>
@@ -73,7 +73,7 @@ function TodoRow({
           onClick={() => onReact(todo.id, 'LIKE')}
           className={cn(
             'flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors',
-            myLike ? 'bg-primary-50 text-primary-600 font-medium' : 'text-gray-400 hover:bg-gray-50',
+            myLike ? 'bg-violet-50 text-primary-600 font-medium' : 'text-gray-400 hover:bg-gray-50',
           )}
         >
           <ThumbsUp className="h-3 w-3" /> {likes}
@@ -126,7 +126,7 @@ function TodoRow({
             <button
               onClick={() => onComment(todo.id)}
               disabled={!commentText[todo.id]?.trim()}
-              className="px-2.5 py-1.5 bg-primary-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40"
+              className="px-2.5 py-1.5 bg-violet-500 text-white rounded-xl text-xs hover:bg-primary-600 disabled:opacity-40"
             >
               전송
             </button>
@@ -239,7 +239,7 @@ function MemberTodosPanel({
           <div className="mt-3">
             <div className="flex justify-between items-center mb-1">
               <span className="text-xs text-gray-400">오늘 달성률</span>
-              <span className={cn('text-xs font-bold', pct === 100 ? 'text-green-500' : 'text-primary-500')}>{pct}%</span>
+              <span className={cn('text-xs font-bold', pct === 100 ? 'text-green-500' : 'text-violet-500')}>{pct}%</span>
             </div>
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
@@ -546,7 +546,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                 {myMember && crew?.visibility === 'PRIVATE' && (
                   <button
                     onClick={handleCopyInvite}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-primary-50 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 border border-primary-200 rounded-xl hover:bg-violet-50 transition-colors"
                   >
                     {copiedInvite ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                     {copiedInvite ? '복사됨' : '초대링크'}
@@ -595,7 +595,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                     key={m.id}
                     className={cn(
                       'flex items-center transition-colors last:rounded-b-2xl',
-                      isSelected ? 'bg-primary-50/40' : 'hover:bg-gray-50',
+                      isSelected ? 'bg-violet-50/40' : 'hover:bg-gray-50',
                     )}
                   >
                     <button
@@ -738,7 +738,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                       type="button"
                       onClick={() => setEditCategory(c)}
                       className={`px-3 py-1 rounded-xl text-xs font-medium border transition-all ${
-                        editCategory === c ? 'bg-primary-500 text-white border-primary-500' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        editCategory === c ? 'bg-violet-500 text-white border-primary-500' : 'border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
                     >
                       {labels[c]}
@@ -751,7 +751,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                 <button
                   onClick={handleEditSave}
                   disabled={editSaving || !editName.trim()}
-                  className="flex-1 py-2.5 rounded-2xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-40 transition-colors"
+                  className="flex-1 py-2.5 rounded-2xl bg-violet-500 text-white text-sm font-semibold hover:bg-primary-600 disabled:opacity-40 transition-colors"
                 >
                   {editSaving ? '저장 중...' : '저장'}
                 </button>
@@ -774,7 +774,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                   className={cn(
                     'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-medium transition-colors border',
                     reportReason === r.value
-                      ? 'bg-primary-50 border-primary-300 text-primary-700'
+                      ? 'bg-violet-50 border-primary-300 text-primary-700'
                       : 'border-gray-100 text-gray-600 hover:bg-gray-50',
                   )}
                 >

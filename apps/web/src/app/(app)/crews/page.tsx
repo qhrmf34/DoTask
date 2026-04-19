@@ -4,11 +4,13 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Plus, Users, Lock, X, Eye, EyeOff, Crown, Tag, ChevronRight, RefreshCw } from 'lucide-react';
-import { resolveUrl } from '@/lib/utils';
+import { Search, Plus, Users, Lock, X, Eye, EyeOff, Crown, Tag, ChevronRight, RefreshCw, Bell, CheckSquare, Square, FileText, MessageCircle, ThumbsUp, UserPlus, ShieldCheck, ArrowRight, ListTodo } from 'lucide-react';
+import { format } from 'date-fns';
+import { resolveUrl, formatRelativeTime, cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { PomodoroTimer } from '@/components/pomodoro/PomodoroTimer';
+import { MiniCalendar } from '@/components/calendar/MiniCalendar';
 import api from '@/lib/api';
 
 interface CrewOwner { id: string; nickname: string; profileImage?: string }
@@ -31,7 +33,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   Study: '공부', Sports: '스포츠', Hobby: '취미', Work: '업무', Game: '게임', Other: '기타',
 };
 const CATEGORY_COLORS: Record<string, string> = {
-  Study: '#7c6ff7', Sports: '#22c55e', Hobby: '#ec4899', Work: '#3b82f6', Game: '#f59e0b', Other: '#6b7280',
+  Study: '#ff6b8b', Sports: '#22c55e', Hobby: '#ec4899', Work: '#3b82f6', Game: '#f59e0b', Other: '#6b7280',
 };
 
 function getOwner(crew: Crew): CrewOwner | null {
@@ -297,6 +299,140 @@ function SearchFilter({
   );
 }
 
+/* ─── 알림 타입별 설정 ─────────────────────────── */
+function getNotifIcon(type: string) {
+  if (type === 'NEW_POST') return { icon: <FileText className="h-3.5 w-3.5" />, bg: 'bg-violet-50', color: 'text-violet-500' };
+  if (type?.includes('COMMENT')) return { icon: <MessageCircle className="h-3.5 w-3.5" />, bg: 'bg-amber-50', color: 'text-amber-500' };
+  if (type?.includes('REACTION')) return { icon: <ThumbsUp className="h-3.5 w-3.5" />, bg: 'bg-pink-50', color: 'text-pink-500' };
+  if (type?.includes('CREW') || type?.includes('JOIN')) return { icon: <UserPlus className="h-3.5 w-3.5" />, bg: 'bg-green-50', color: 'text-green-500' };
+  if (type === 'REPORT_PROCESSED') return { icon: <ShieldCheck className="h-3.5 w-3.5" />, bg: 'bg-blue-50', color: 'text-blue-500' };
+  return { icon: <Bell className="h-3.5 w-3.5" />, bg: 'bg-gray-100', color: 'text-gray-400' };
+}
+
+/* ─── 오른쪽 사이드바 패널들 ──────────────────── */
+function RecentNotificationsPanel() {
+  const { data } = useQuery({
+    queryKey: ['notifications-recent'],
+    queryFn: () => api.get('/notifications').then((r) => r.data).catch(() => ({ items: [] })),
+  });
+  const items: any[] = (data?.items ?? []).slice(0, 5);
+  const unread = items.filter((n) => !n.isRead).length;
+
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #f0f0f0' }}>
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-lg bg-violet-50 flex items-center justify-center">
+            <Bell className="h-3.5 w-3.5 text-violet-500" />
+          </div>
+          <span className="text-sm font-bold text-gray-900">최근 알림</span>
+          {unread > 0 && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500 text-white">{unread}</span>
+          )}
+        </div>
+        <Link href="/notifications" className="text-[11px] font-semibold text-violet-500 hover:text-primary-700 flex items-center gap-0.5">
+          전체 <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="py-6 flex flex-col items-center gap-2">
+          <Bell className="h-8 w-8 text-gray-200" />
+          <p className="text-xs text-gray-400">알림이 없습니다</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {items.map((n) => {
+            const cfg = getNotifIcon(n.type);
+            return (
+              <Link
+                key={n.id}
+                href="/notifications"
+                className={cn('flex items-start gap-2.5 px-4 py-3 hover:bg-gray-50 transition-colors', !n.isRead && 'bg-violet-50/30')}
+              >
+                <div className={cn('h-7 w-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5', cfg.bg, cfg.color)}>
+                  {cfg.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-xs leading-snug truncate', n.isRead ? 'text-gray-600' : 'text-gray-900 font-semibold')}>{n.title}</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{formatRelativeTime(n.createdAt)}</p>
+                </div>
+                {!n.isRead && <div className="h-1.5 w-1.5 rounded-full bg-violet-500 shrink-0 mt-1.5" />}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TodayTodosPanel() {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const { data: todos = [] } = useQuery<any[]>({
+    queryKey: ['todos', today],
+    queryFn: () => api.get(`/todos?date=${today}`).then((r) => r.data).catch(() => []),
+  });
+
+  const done = todos.filter((t) => t.isCompleted).length;
+  const total = todos.length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
+      <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid #f0f0f0' }}>
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-lg bg-violet-50 flex items-center justify-center">
+            <ListTodo className="h-3.5 w-3.5 text-violet-500" />
+          </div>
+          <span className="text-sm font-bold text-gray-900">오늘 할일</span>
+        </div>
+        <Link href="/todos" className="text-[11px] font-semibold text-violet-500 hover:text-primary-700 flex items-center gap-0.5">
+          전체 <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      <div className="px-4 py-3">
+        {/* 진행률 */}
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className={cn('h-full rounded-full transition-all duration-500', pct >= 100 ? 'bg-mint-400' : 'progress-shimmer')}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <span className={cn('text-xs font-bold tabular-nums shrink-0', pct >= 100 ? 'text-mint-500' : 'text-primary-600')}>{pct}%</span>
+          <span className="text-[11px] text-gray-400 shrink-0">{done}/{total}</span>
+        </div>
+
+        {total === 0 ? (
+          <div className="py-4 flex flex-col items-center gap-2">
+            <img src="/mascot/mascot_waiting.png" alt="" style={{ height: 56, width: 'auto', objectFit: 'contain' }} />
+            <p className="text-xs text-gray-400">오늘 할일을 추가해보세요</p>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {todos.slice(0, 5).map((t) => (
+              <div key={t.id} className="flex items-center gap-2.5 px-1">
+                {t.isCompleted
+                  ? <CheckSquare className="h-4 w-4 text-mint-500 shrink-0" />
+                  : <Square className="h-4 w-4 text-gray-300 shrink-0" />
+                }
+                <span className={cn('text-xs truncate', t.isCompleted ? 'line-through text-gray-400' : 'text-gray-700')}>
+                  {t.title}
+                </span>
+              </div>
+            ))}
+            {todos.length > 5 && (
+              <p className="text-[11px] text-gray-400 pl-1 pt-1">+{todos.length - 5}개 더</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── 메인 ─────────────────────────────────────── */
 export default function CrewsPage() {
   const qc = useQueryClient();
@@ -343,120 +479,130 @@ export default function CrewsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
-      <div className="max-w-5xl mx-auto px-6 py-6 pb-20">
+      <div className="max-w-6xl mx-auto px-6 py-6 pb-20">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_272px] gap-5 items-start">
 
-        {/* 전체 카드 */}
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
+          {/* ── 메인 카드 ── */}
+          <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
 
-          {/* 상단 헤더 영역 */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-            <h1 className="text-lg font-extrabold text-gray-900">크루</h1>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  setRefreshing(true);
-                  await Promise.all([
-                    qc.invalidateQueries({ queryKey: ['my-crews'] }),
-                    qc.invalidateQueries({ queryKey: ['crews'] }),
-                  ]);
-                  setTimeout(() => setRefreshing(false), 600);
-                }}
-                className="h-8 w-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                title="새로고침"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 transition-transform ${refreshing ? 'animate-spin' : ''}`} />
-              </button>
-              <Link href="/crews/new">
-                <Button size="sm" className="gap-1.5 shrink-0">
-                  <Plus className="h-4 w-4" /> 크루 만들기
-                </Button>
-              </Link>
+            {/* 헤더 */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h1 className="text-lg font-extrabold text-gray-900">크루</h1>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setRefreshing(true);
+                    await Promise.all([
+                      qc.invalidateQueries({ queryKey: ['my-crews'] }),
+                      qc.invalidateQueries({ queryKey: ['crews'] }),
+                    ]);
+                    setTimeout(() => setRefreshing(false), 600);
+                  }}
+                  className="h-8 w-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  title="새로고침"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 transition-transform ${refreshing ? 'animate-spin' : ''}`} />
+                </button>
+                <Link href="/crews/new">
+                  <Button size="sm" className="gap-1.5 shrink-0">
+                    <Plus className="h-4 w-4" /> 크루 만들기
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* 탭 + 검색 + 그리드 */}
+            <div className="px-6 py-5 space-y-4">
+              {/* 탭 */}
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl max-w-xs">
+                {(['explore', 'mine'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className={cn(
+                      'flex-1 py-2 text-sm font-semibold rounded-lg transition-all',
+                      tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
+                    )}
+                  >
+                    {t === 'explore' ? '크루 탐색' : (
+                      <>내 크루{myCrews.length > 0 && (
+                        <span className={cn('ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full', tab === 'mine' ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-500')}>
+                          {myCrews.length}
+                        </span>
+                      )}</>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* 내 크루 탭 */}
+              {tab === 'mine' && (
+                <div className="space-y-5">
+                  <SearchFilter
+                    q={myQ} onQChange={setMyQ} onSearch={() => setMySearch(myQ)}
+                    selectedCategory={myCategory} onCategoryChange={setMyCategory}
+                  />
+                  {myCrews.length === 0 ? (
+                    <div className="py-24 text-center">
+                      <p className="text-base font-semibold text-gray-500">아직 가입한 크루가 없어요</p>
+                      <p className="text-sm text-gray-400 mt-1 mb-5">크루를 탐색하거나 직접 만들어보세요</p>
+                      <button onClick={() => setTab('explore')}
+                        className="text-sm font-semibold text-violet-500 hover:text-primary-600 underline underline-offset-2">
+                        크루 탐색하기
+                      </button>
+                    </div>
+                  ) : filteredMyCrews.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <p className="text-sm text-gray-400">검색 결과가 없습니다</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {filteredMyCrews.map((crew) => (
+                        <CrewCard key={crew.id} crew={crew} isMine />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 탐색 탭 */}
+              {tab === 'explore' && (
+                <div className="space-y-5">
+                  <SearchFilter
+                    q={expQ} onQChange={setExpQ} onSearch={() => setExpSearch(expQ)}
+                    selectedCategory={expCategory} onCategoryChange={setExpCategory}
+                  />
+                  {publicCrews && publicCrews.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {publicCrews.map((crew) => (
+                        <CrewCard
+                          key={crew.id}
+                          crew={crew}
+                          isMine={myCrewIds.has(crew.id)}
+                          onClick={() => !myCrewIds.has(crew.id) && setJoiningCrew(crew)}
+                        />
+                      ))}
+                    </div>
+                  ) : publicCrews?.length === 0 ? (
+                    <div className="py-16 text-center">
+                      <p className="text-sm font-semibold text-gray-500">크루가 없습니다</p>
+                      <p className="text-xs text-gray-400 mt-1">다른 키워드나 카테고리로 찾아보세요</p>
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* 탭 + 검색 + 그리드 */}
-          <div className="px-6 py-5 space-y-4">
+          {/* ── 오른쪽 사이드바 ── */}
+          <div className="hidden xl:flex flex-col gap-4">
+            <PomodoroTimer />
+            <MiniCalendar />
+            <RecentNotificationsPanel />
+            <TodayTodosPanel />
+          </div>
 
-          {/* 탭 */}
-          <div className="flex gap-1 p-1 bg-gray-100 rounded-xl max-w-xs">
-          {(['explore', 'mine'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                'flex-1 py-2 text-sm font-semibold rounded-lg transition-all',
-                tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {t === 'explore' ? '크루 탐색' : (
-                <>내 크루{myCrews.length > 0 && (
-                  <span className={cn('ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full', tab === 'mine' ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-500')}>
-                    {myCrews.length}
-                  </span>
-                )}</>
-              )}
-            </button>
-          ))}
         </div>
-
-        {/* 내 크루 탭 */}
-        {tab === 'mine' && (
-          <div className="space-y-5">
-            <SearchFilter
-              q={myQ} onQChange={setMyQ} onSearch={() => setMySearch(myQ)}
-              selectedCategory={myCategory} onCategoryChange={setMyCategory}
-            />
-            {myCrews.length === 0 ? (
-              <div className="py-24 text-center">
-                <p className="text-base font-semibold text-gray-500">아직 가입한 크루가 없어요</p>
-                <p className="text-sm text-gray-400 mt-1 mb-5">크루를 탐색하거나 직접 만들어보세요</p>
-                <button onClick={() => setTab('explore')}
-                  className="text-sm font-semibold text-primary-500 hover:text-primary-600 underline underline-offset-2">
-                  크루 탐색하기
-                </button>
-              </div>
-            ) : filteredMyCrews.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-sm text-gray-400">검색 결과가 없습니다</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredMyCrews.map((crew) => (
-                  <CrewCard key={crew.id} crew={crew} isMine />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 탐색 탭 */}
-        {tab === 'explore' && (
-          <div className="space-y-5">
-            <SearchFilter
-              q={expQ} onQChange={setExpQ} onSearch={() => setExpSearch(expQ)}
-              selectedCategory={expCategory} onCategoryChange={setExpCategory}
-            />
-            {publicCrews && publicCrews.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {publicCrews.map((crew) => (
-                  <CrewCard
-                    key={crew.id}
-                    crew={crew}
-                    isMine={myCrewIds.has(crew.id)}
-                    onClick={() => !myCrewIds.has(crew.id) && setJoiningCrew(crew)}
-                  />
-                ))}
-              </div>
-            ) : publicCrews?.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-sm font-semibold text-gray-500">크루가 없습니다</p>
-                <p className="text-xs text-gray-400 mt-1">다른 키워드나 카테고리로 찾아보세요</p>
-              </div>
-            ) : null}
-          </div>
-          )}
-          </div>{/* 탭+검색+그리드 끝 */}
-        </div>{/* 전체 카드 끝 */}
       </div>
 
       {joiningCrew && <JoinModal crew={joiningCrew} onClose={() => setJoiningCrew(null)} />}

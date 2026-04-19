@@ -51,7 +51,7 @@ function ReportModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (re
               onClick={() => setReason(r.value)}
               className={cn(
                 'w-full text-left px-4 py-2.5 rounded-2xl text-sm font-medium border transition-all',
-                reason === r.value ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-gray-100 hover:border-primary-200 text-gray-700',
+                reason === r.value ? 'border-primary-400 bg-violet-50 text-primary-700' : 'border-gray-100 hover:border-primary-200 text-gray-700',
               )}
             >
               {r.label}
@@ -219,7 +219,7 @@ function PostCard({
               {post.content}
             </p>
             {post.content.length > 200 && (
-              <button onClick={() => setExpanded(!expanded)} className="text-xs text-primary-500 mt-1 hover:underline">
+              <button onClick={() => setExpanded(!expanded)} className="text-xs text-violet-500 mt-1 hover:underline">
                 {expanded ? '접기' : '더보기'}
               </button>
             )}
@@ -245,7 +245,7 @@ function PostCard({
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm transition-all',
                   myReaction?.type === 'LIKE'
-                    ? 'bg-primary-50 text-primary-600 font-medium'
+                    ? 'bg-violet-50 text-primary-600 font-medium'
                     : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600',
                 )}
               >
@@ -330,7 +330,7 @@ function PostCard({
                   <button
                     onClick={handleComment}
                     disabled={!commentText.trim()}
-                    className="px-3 py-2 bg-primary-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
+                    className="px-3 py-2 bg-violet-500 text-white rounded-xl text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
                   >
                     <Send className="h-4 w-4" />
                   </button>
@@ -440,7 +440,7 @@ function WriteCard({ crewId, onPost, user }: { crewId: string; onPost: () => voi
                 <button
                   onClick={handlePost}
                   disabled={(!content.trim() && images.length === 0) || posting}
-                  className="px-4 py-1.5 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
+                  className="px-4 py-1.5 rounded-lg bg-violet-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
                 >
                   게시
                 </button>
