@@ -7,7 +7,7 @@ import {
   UserX, Check, X, ChevronLeft, ChevronRight, MessageSquare, ArrowLeft, FileText, ChevronRight as _CR,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
-import { cn, formatDate } from '@/lib/utils';
+import { cn, formatDate, resolveUrl } from '@/lib/utils';
 import api from '@/lib/api';
 
 type Tab = 'overview' | 'users' | 'crews' | 'reports';
@@ -110,7 +110,7 @@ function CrewDetail({ crew, onBack }: { crew: any; onBack: () => void }) {
         style={{ background: `linear-gradient(135deg, ${crew.themeColor}18, white)` }}
       >
         {crew.bannerImage && (
-          <img src={crew.bannerImage} alt="" className="w-full h-24 object-cover" />
+          <img src={resolveUrl(crew.bannerImage)} alt="" className="w-full h-24 object-cover" />
         )}
         <div className="px-5 py-4 flex items-center gap-4">
           <div className="flex-1 min-w-0">
@@ -320,44 +320,48 @@ export default function AdminPage() {
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-20 md:pb-8 space-y-5">
+      <div className="max-w-4xl mx-auto px-4 py-6 pb-20 md:pb-8">
+        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
 
-        {/* Page title */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">관리자 패널</h1>
-          {stats && (
-            <span className="text-xs text-gray-400">
-              유저 {stats.users}명 · 크루 {stats.crews}개 · 미처리 신고 {stats.pendingReports}건
-            </span>
-          )}
-        </div>
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #eeeeee' }}>
+            <h1 className="text-xl font-bold text-gray-900">관리자 패널</h1>
+            {stats && (
+              <span className="text-xs text-gray-400">
+                유저 {stats.users}명 · 크루 {stats.crews}개 · 미처리 신고 {stats.pendingReports}건
+              </span>
+            )}
+          </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 p-1 rounded-2xl border border-gray-200 bg-white w-fit">
-          {TABS.map(({ key, label, badge }: any) => (
-            <button
-              key={key}
-              onClick={() => { setTab(key as Tab); setSelectedCrew(null); }}
-              className={cn(
-                'relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all',
-                tab === key
-                  ? 'text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
-              )}
-              style={tab === key ? { background: 'linear-gradient(135deg,#a78bfa,#8b5cf6)' } : {}}
-            >
-              {label}
-              {badge > 0 && (
-                <span className={cn(
-                  'h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center',
-                  tab === key ? 'bg-white/30 text-white' : 'bg-red-500 text-white',
-                )}>
-                  {badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+          {/* Tabs */}
+          <div className="flex items-center gap-1 px-6 py-3" style={{ borderBottom: '1px solid #f0f0f0' }}>
+            {TABS.map(({ key, label, badge }: any) => (
+              <button
+                key={key}
+                onClick={() => { setTab(key as Tab); setSelectedCrew(null); }}
+                className={cn(
+                  'relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+                  tab === key
+                    ? 'text-white shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50',
+                )}
+                style={tab === key ? { background: 'linear-gradient(135deg,#a78bfa,#8b5cf6)' } : {}}
+              >
+                {label}
+                {badge > 0 && (
+                  <span className={cn(
+                    'h-4 min-w-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center',
+                    tab === key ? 'bg-white/30 text-white' : 'bg-red-500 text-white',
+                  )}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Content */}
+          <div className="px-6 py-5 space-y-3">
 
         {/* ── Overview ── */}
         {tab === 'overview' && stats && (
@@ -484,7 +488,7 @@ export default function AdminPage() {
                       {/* 배너 이미지 있으면 사진, 없으면 아무것도 표시 안 함 */}
                       {c.bannerImage && (
                         <img
-                          src={c.bannerImage}
+                          src={resolveUrl(c.bannerImage)}
                           alt={c.name}
                           className="h-12 w-12 rounded-xl object-cover shrink-0 border border-gray-100"
                         />
@@ -666,6 +670,9 @@ export default function AdminPage() {
             )}
           </div>
         )}
+
+          </div>{/* Content */}
+        </div>{/* White card */}
       </div>
 
       {/* 쪽지 모달 */}

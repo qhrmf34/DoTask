@@ -1,3 +1,5 @@
+import { Suspense } from 'react';
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
@@ -38,7 +40,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             </div>
             <span className="font-bold text-gray-900">DoTask</span>
           </div>
-          {children}
+          <Suspense>{children}</Suspense>
         </div>
       </div>
     </div>

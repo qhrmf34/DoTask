@@ -43,7 +43,7 @@ services:
       REDIS_PORT: 6379
       TZ: Asia/Seoul
     ports:
-      - '4000:4000'
+      - '4200:4200'
     depends_on:
       postgres:
         condition: service_healthy

@@ -108,7 +108,7 @@ pnpm --filter api db:generate
 pnpm dev
 
 # 또는 개별 실행
-pnpm --filter api dev   # http://localhost:4000
+pnpm --filter api dev   # http://localhost:4200
 pnpm --filter web dev   # http://localhost:3000
 ```
 
@@ -155,7 +155,7 @@ certbot certonly --standalone -d yourdomain.com
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | AWS 자격증명 |
 | `AWS_S3_BUCKET` / `AWS_S3_REGION` | S3 버킷 설정 |
-| `API_PORT` | API 서버 포트 (기본 4000) |
+| `API_PORT` | API 서버 포트 (기본 4200) |
 | `FRONTEND_URL` | CORS 허용 Origin |
 | `NEXT_PUBLIC_API_URL` | 프론트에서 API 호출 URL |
 

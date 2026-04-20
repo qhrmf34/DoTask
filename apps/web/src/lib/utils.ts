@@ -52,6 +52,6 @@ export function formatSeconds(totalSeconds: number) {
 // DB에 저장된 로컬 업로드 URL을 상대경로로 변환 (Next.js rewrites가 프록시)
 export function resolveUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
-  // http://localhost:4000/uploads/... → /uploads/...
+  // http://localhost:4200/uploads/... → /uploads/...
   return url.replace(/^https?:\/\/[^/]+\/uploads\//, '/uploads/');
 }

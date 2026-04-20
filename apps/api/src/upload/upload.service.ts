@@ -45,7 +45,7 @@ export class UploadService {
 
     fs.writeFileSync(path.join(dir, fileName), file.buffer);
 
-    const apiUrl = process.env.API_BASE_URL || `http://localhost:${process.env.API_PORT || 4000}`;
+    const apiUrl = process.env.API_BASE_URL || `http://localhost:${process.env.API_PORT || 4200}`;
     return `${apiUrl}/uploads/${folder}/${fileName}`;
   }
 

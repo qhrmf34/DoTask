@@ -7,10 +7,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/auth.store';
 import api from '@/lib/api';
+
+const TURNSTILE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
 
 const schema = z.object({
   email: z.string().email('올바른 이메일을 입력하세요'),
@@ -28,6 +31,7 @@ export default function LoginPage() {
   const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [cfToken, setCfToken] = useState<string | null>(TURNSTILE_KEY ? null : 'skip');
 
   const {
     register,
@@ -93,7 +97,17 @@ export default function LoginPage() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" loading={isSubmitting}>
+        {TURNSTILE_KEY && (
+          <Turnstile
+            siteKey={TURNSTILE_KEY}
+            options={{ size: 'flexible' }}
+            onSuccess={setCfToken}
+            onExpire={() => setCfToken(null)}
+            onError={() => setCfToken(null)}
+          />
+        )}
+
+        <Button type="submit" className="w-full" loading={isSubmitting} disabled={!cfToken}>
           로그인
         </Button>
       </form>

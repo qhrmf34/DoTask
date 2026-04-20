@@ -22,7 +22,7 @@ export function getSocket(token?: string): Socket {
   const resolvedToken = token ?? useAuthStore.getState().accessToken ?? undefined;
 
   if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000', {
+    socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4200', {
       auth: { token: resolvedToken },
       withCredentials: true,
       transports: ['websocket'],

@@ -46,7 +46,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.API_PORT || 4000;
+  const port = process.env.API_PORT || 4200;
   await app.listen(port);
   console.log(`API server running on http://localhost:${port}`);
   console.log(`File storage: ${process.env.AWS_ACCESS_KEY_ID ? 'AWS S3' : 'Local (./uploads)'}`);

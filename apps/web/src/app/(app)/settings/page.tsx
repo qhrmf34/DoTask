@@ -83,7 +83,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
-      <div className="max-w-lg mx-auto px-4 py-8 pb-20 space-y-4">
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-20 space-y-4">
 
         {/* 프로필 카드 */}
         <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>

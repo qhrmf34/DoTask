@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth.store';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4200';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -21,7 +21,8 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config ?? {};
-    if (error.response?.status === 401 && !original._retry) {
+    const isAuthRoute = original.url?.includes('/auth/login') || original.url?.includes('/auth/register');
+    if (error.response?.status === 401 && !original._retry && !isAuthRoute) {
       original._retry = true;
       const refreshToken = useAuthStore.getState().refreshToken;
       if (refreshToken) {
