@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, LogOut, CheckCircle2, TrendingUp, Users, Flame } from 'lucide-react';
+import { Camera, LogOut, CheckCircle2, TrendingUp, Users, Flame, AlertTriangle } from 'lucide-react';
 import { useDialog } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +74,24 @@ export default function SettingsPage() {
     router.push('/login');
   };
 
+  const handleDeleteAccount = async () => {
+    const ok = await confirm({
+      title: '회원 탈퇴',
+      message: '탈퇴하면 모든 데이터(할일, 크루, 포모도로 기록)가 삭제되며 복구할 수 없습니다.\n정말 탈퇴하시겠습니까?',
+      confirmText: '탈퇴하기',
+      cancelText: '취소',
+      type: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await api.delete('/users/me');
+      logout();
+      router.push('/login');
+    } catch (e: any) {
+      await confirm({ title: '오류', message: e.response?.data?.message || '탈퇴에 실패했습니다.', confirmText: '확인', type: 'alert' });
+    }
+  };
+
   const statItems = stats ? [
     { icon: <CheckCircle2 className="h-4 w-4" />, label: '완료한 할일', value: stats.totalCompleted, unit: '개', color: '#7c6ff7' },
     { icon: <TrendingUp className="h-4 w-4" />, label: '이번달 달성률', value: monthlyStats?.monthlyPct ?? stats.monthPct, unit: '%', color: '#22c55e' },
@@ -126,7 +144,22 @@ export default function SettingsPage() {
 
           {/* 편집 폼 */}
           <div className="px-6 py-5 space-y-4">
-            <Input label="닉네임" value={nickname} onChange={(e) => setNickname(e.target.value)} />
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">닉네임</label>
+                <span className={`text-[11px] tabular-nums ${nickname.length > 14 ? 'text-red-400' : 'text-gray-300'}`}>
+                  {nickname.length}/16
+                </span>
+              </div>
+              <Input
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value.slice(0, 16))}
+                placeholder="2~16자"
+              />
+              {nickname.length > 0 && nickname.length < 2 && (
+                <p className="text-xs text-red-400">닉네임은 최소 2자 이상이어야 합니다</p>
+              )}
+            </div>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700">소개</label>
@@ -143,19 +176,25 @@ export default function SettingsPage() {
                 onChange={(e) => setBio(e.target.value)}
               />
             </div>
-            <Button onClick={handleSaveProfile} className="w-full">
+            <Button onClick={handleSaveProfile} className="w-full" disabled={nickname.length < 2 || nickname.length > 16}>
               {saved ? '저장됐어요!' : '저장'}
             </Button>
           </div>
         </div>
 
         {/* 계정 카드 */}
-        <div className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #e8e8e8' }}>
+        <div className="bg-white rounded-2xl overflow-hidden divide-y divide-gray-50" style={{ border: '1px solid #e8e8e8' }}>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-6 py-4 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-500 transition-colors"
           >
             <LogOut className="h-4 w-4" /> 로그아웃
+          </button>
+          <button
+            onClick={handleDeleteAccount}
+            className="flex items-center gap-3 w-full px-6 py-4 text-sm font-medium text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+          >
+            <AlertTriangle className="h-4 w-4" /> 회원 탈퇴
           </button>
         </div>
 

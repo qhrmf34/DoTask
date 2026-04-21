@@ -147,10 +147,47 @@ function formatDateKr(date: Date) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function MemberProfileView({ member }: { member: Member }) {
+  const rc = roleConfig[member.role] ?? roleConfig.MEMBER;
+  const joinedDate = new Date(member.joinedAt);
+  const formattedJoin = `${joinedDate.getFullYear()}.${String(joinedDate.getMonth() + 1).padStart(2, '0')}.${String(joinedDate.getDate()).padStart(2, '0')}`;
+
+  return (
+    <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-6 space-y-5">
+      {/* Avatar */}
+      <div className="flex flex-col items-center gap-3">
+        <Avatar src={member.user.profileImage} fallback={member.user.nickname} size="lg" />
+        <div className="text-center">
+          <p className="text-base font-bold text-gray-900">{member.user.nickname}</p>
+          <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full mt-1', rc.bg, rc.text)}>
+            {rc.icon} {rc.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Bio */}
+      <div className="bg-white rounded-2xl px-4 py-3.5" style={{ border: '1px solid #e8e8e8' }}>
+        <p className="text-[11px] font-semibold text-gray-400 mb-1.5">자기소개</p>
+        {member.user.bio ? (
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{member.user.bio}</p>
+        ) : (
+          <p className="text-sm text-gray-400 italic">소개가 없습니다</p>
+        )}
+      </div>
+
+      {/* Join date */}
+      <div className="bg-white rounded-2xl px-4 py-3.5" style={{ border: '1px solid #e8e8e8' }}>
+        <p className="text-[11px] font-semibold text-gray-400 mb-1.5">가입일</p>
+        <p className="text-sm text-gray-700">{formattedJoin}</p>
+      </div>
+    </div>
+  );
+}
+
 function MemberTodosPanel({
-  crewId, member, onClose,
+  crewId, member, view, onToggleView, onClose,
 }: {
-  crewId: string; member: Member; onClose: () => void;
+  crewId: string; member: Member; view: 'todos' | 'profile'; onToggleView: () => void; onClose: () => void;
 }) {
   const me = useAuthStore((s) => s.user);
   const qc = useQueryClient();
@@ -215,27 +252,47 @@ function MemberTodosPanel({
   return (
     <div className="flex flex-col h-full w-80 shrink-0" style={{ background: '#f7f8fa', borderLeft: '1px solid #e8e4f8' }}>
       {/* Panel header */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-100 bg-white">
         <div className="flex items-center gap-3">
-          <Avatar src={member.user.profileImage} fallback={member.user.nickname} size="md" />
+          <button onClick={onToggleView} className="shrink-0 hover:opacity-80 transition-opacity" title={view === 'todos' ? '프로필 보기' : '할일 보기'}>
+            <Avatar src={member.user.profileImage} fallback={member.user.nickname} size="md" />
+          </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <p className="text-sm font-bold text-gray-900 truncate">{member.user.nickname}</p>
+              <button onClick={onToggleView} className="text-sm font-bold text-gray-900 truncate hover:text-primary-600 transition-colors">
+                {member.user.nickname}
+              </button>
               <span className={cn('flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full', rc.bg, rc.text)}>
                 {rc.icon} {rc.label}
               </span>
             </div>
-            {member.user.bio && (
-              <p className="text-xs text-gray-400 truncate mt-0.5">{member.user.bio}</p>
-            )}
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {view === 'todos' ? '클릭하면 프로필 보기' : '클릭하면 할일 보기'}
+            </p>
           </div>
           <button onClick={onClose} className="h-7 w-7 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 flex items-center justify-center transition-colors shrink-0">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Progress bar */}
-        {totalCount > 0 && (
+        {/* Tab indicator */}
+        <div className="flex gap-1 mt-3 p-0.5 bg-gray-100 rounded-xl">
+          <button
+            onClick={() => view !== 'todos' && onToggleView()}
+            className={cn('flex-1 py-1 text-xs font-semibold rounded-lg transition-all', view === 'todos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500')}
+          >
+            할일
+          </button>
+          <button
+            onClick={() => view !== 'profile' && onToggleView()}
+            className={cn('flex-1 py-1 text-xs font-semibold rounded-lg transition-all', view === 'profile' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500')}
+          >
+            프로필
+          </button>
+        </div>
+
+        {/* Progress bar (todos view only) */}
+        {view === 'todos' && totalCount > 0 && (
           <div className="mt-3">
             <div className="flex justify-between items-center mb-1">
               <span className="text-xs text-gray-400">오늘 달성률</span>
@@ -251,44 +308,30 @@ function MemberTodosPanel({
         )}
       </div>
 
-      {/* Date nav */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50/50">
-        <button onClick={() => changeDate(-1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
-          <ChevronLeft className="h-4 w-4 text-gray-500" />
-        </button>
-        <span className="text-xs font-semibold text-gray-700">{date}</span>
-        <button onClick={() => changeDate(1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
-          <ChevronRight className="h-4 w-4 text-gray-500" />
-        </button>
-      </div>
-
-      {/* Todo list */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-2" style={{ background: '#f7f8fa' }}>
-        {todos.length === 0 ? (
-          <div className="py-10 text-center">
-            <p className="text-sm text-gray-400">할일이 없습니다</p>
+      {view === 'profile' ? (
+        <MemberProfileView member={member} />
+      ) : (
+        <>
+          {/* Date nav */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-gray-50/50">
+            <button onClick={() => changeDate(-1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
+              <ChevronLeft className="h-4 w-4 text-gray-500" />
+            </button>
+            <span className="text-xs font-semibold text-gray-700">{date}</span>
+            <button onClick={() => changeDate(1)} className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors">
+              <ChevronRight className="h-4 w-4 text-gray-500" />
+            </button>
           </div>
-        ) : (
-          <>
-            {pending.map((todo) => (
-              <TodoRow
-                key={todo.id}
-                todo={todo}
-                meId={me?.id}
-                expandedTodo={expandedTodo}
-                commentText={commentText}
-                comments={comments}
-                loadingComments={loadingComments}
-                onReact={handleReact}
-                onToggleComments={toggleComments}
-                onComment={handleComment}
-                onCommentChange={(id, val) => setCommentText((prev) => ({ ...prev, [id]: val }))}
-              />
-            ))}
-            {completed.length > 0 && (
-              <div className="pt-1">
-                <p className="text-xs text-gray-400 px-1 mb-2">완료 {completed.length}개</p>
-                {completed.map((todo) => (
+
+          {/* Todo list */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-2" style={{ background: '#f7f8fa' }}>
+            {todos.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm text-gray-400">할일이 없습니다</p>
+              </div>
+            ) : (
+              <>
+                {pending.map((todo) => (
                   <TodoRow
                     key={todo.id}
                     todo={todo}
@@ -303,11 +346,31 @@ function MemberTodosPanel({
                     onCommentChange={(id, val) => setCommentText((prev) => ({ ...prev, [id]: val }))}
                   />
                 ))}
-              </div>
+                {completed.length > 0 && (
+                  <div className="pt-1">
+                    <p className="text-xs text-gray-400 px-1 mb-2">완료 {completed.length}개</p>
+                    {completed.map((todo) => (
+                      <TodoRow
+                        key={todo.id}
+                        todo={todo}
+                        meId={me?.id}
+                        expandedTodo={expandedTodo}
+                        commentText={commentText}
+                        comments={comments}
+                        loadingComments={loadingComments}
+                        onReact={handleReact}
+                        onToggleComments={toggleComments}
+                        onComment={handleComment}
+                        onCommentChange={(id, val) => setCommentText((prev) => ({ ...prev, [id]: val }))}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -319,6 +382,7 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
   const qc = useQueryClient();
   const { confirm } = useDialog();
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [panelView, setPanelView] = useState<'todos' | 'profile'>('todos');
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reportModal, setReportModal] = useState<{ userId: string; nickname: string } | null>(null);
@@ -599,7 +663,14 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
                     )}
                   >
                     <button
-                      onClick={() => setSelectedMember(isSelected ? null : m)}
+                      onClick={() => {
+                        if (isSelected) {
+                          setPanelView((v) => v === 'todos' ? 'profile' : 'todos');
+                        } else {
+                          setSelectedMember(m);
+                          setPanelView('todos');
+                        }
+                      }}
                       className="flex flex-1 items-center gap-3 px-5 py-3.5 text-left"
                     >
                       <Avatar src={m.user.profileImage} fallback={m.user.nickname} size="sm" />
@@ -669,6 +740,8 @@ export default function MembersPage({ params }: { params: { crewId: string } }) 
         <MemberTodosPanel
           crewId={crewId}
           member={selectedMember}
+          view={panelView}
+          onToggleView={() => setPanelView((v) => v === 'todos' ? 'profile' : 'todos')}
           onClose={() => setSelectedMember(null)}
         />
       )}

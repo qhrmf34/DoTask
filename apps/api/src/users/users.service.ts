@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -19,6 +19,13 @@ export class UsersService {
   }
 
   async updateMe(userId: string, data: { nickname?: string; bio?: string }) {
+    if (data.nickname !== undefined) {
+      const trimmed = data.nickname.trim();
+      if (trimmed.length < 2 || trimmed.length > 16) {
+        throw new BadRequestException('닉네임은 2~16자여야 합니다.');
+      }
+      data = { ...data, nickname: trimmed };
+    }
     return this.prisma.user.update({
       where: { id: userId },
       data,

@@ -17,8 +17,13 @@ export class CrewsController {
   ) {}
 
   @Get('crews')
-  search(@Query('q') q?: string, @Query('cat') cat?: string, @Query('sort') sort?: string) {
-    return this.crewsService.search(q, cat, sort);
+  search(
+    @Query('q') q?: string,
+    @Query('cat') cat?: string,
+    @Query('sort') sort?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.crewsService.search(q, cat, sort, cursor);
   }
 
   @Get('crews/my')

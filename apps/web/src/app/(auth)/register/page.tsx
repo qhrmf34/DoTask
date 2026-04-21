@@ -15,7 +15,7 @@ import api from '@/lib/api';
 const schema = z
   .object({
     email: z.string().email('올바른 이메일을 입력하세요'),
-    nickname: z.string().min(2, '닉네임은 2자 이상이어야 합니다').max(20, '닉네임은 20자 이하여야 합니다'),
+    nickname: z.string().min(2, '닉네임은 2자 이상이어야 합니다').max(16, '닉네임은 16자 이하여야 합니다'),
     password: z
       .string()
       .min(8, '비밀번호는 8자 이상이어야 합니다')
@@ -33,7 +33,6 @@ export default function RegisterPage() {
   const router = useRouter();
   const setUser = useAuthStore((s) => s.setUser);
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
-  const setRefreshToken = useAuthStore((s) => s.setRefreshToken);
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -50,7 +49,6 @@ export default function RegisterPage() {
       const { confirmPassword, ...payload } = data;
       const res = await api.post('/auth/register', payload);
       setAccessToken(res.data.accessToken);
-      if (res.data.refreshToken) setRefreshToken(res.data.refreshToken);
       const me = await api.get('/users/me');
       setUser(me.data);
       router.push('/todos');

@@ -10,6 +10,14 @@ import api from '@/lib/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string;
+  color: string;
+  emoji: string;
+}
+
 interface Props {
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
@@ -25,12 +33,22 @@ export function MiniCalendar({ selectedDate, onDateSelect }: Props) {
     queryFn: () => api.get(`/todos/calendar?year=${year}&month=${month}`).then((r) => r.data),
   });
 
+  const days = calData?.days ?? (Array.isArray(calData) ? calData : []);
+  const events: CalendarEvent[] = calData?.events ?? [];
+
   const dataMap = new Map<string, { total: number; done: number; pct: number }>(
-    calData?.map((d: any) => [d.date, d]) ?? [],
+    days.map((d: any) => [d.date, d]),
   );
 
-  const days = eachDayOfInterval({ start: startOfMonth(current), end: endOfMonth(current) });
-  const startPad = getDay(days[0]);
+  const eventMap = new Map<string, CalendarEvent[]>();
+  for (const e of events) {
+    const arr = eventMap.get(e.date) ?? [];
+    arr.push(e);
+    eventMap.set(e.date, arr);
+  }
+
+  const calDays = eachDayOfInterval({ start: startOfMonth(current), end: endOfMonth(current) });
+  const startPad = getDay(calDays[0]);
 
   return (
     <div className="card p-4">
@@ -68,11 +86,12 @@ export function MiniCalendar({ selectedDate, onDateSelect }: Props) {
           <div key={`pad-${i}`} />
         ))}
 
-        {days.map((day) => {
+        {calDays.map((day) => {
           const key = format(day, 'yyyy-MM-dd');
           const info = dataMap.get(key);
           const today = isToday(day);
           const selected = selectedDate && isSameDay(day, selectedDate);
+          const dayEvents = eventMap.get(key) ?? [];
 
           return (
             <div
@@ -97,6 +116,18 @@ export function MiniCalendar({ selectedDate, onDateSelect }: Props) {
                     className="h-full bg-primary-400 rounded-full"
                     style={{ width: `${info.pct}%` }}
                   />
+                </div>
+              )}
+              {dayEvents.length > 0 && (
+                <div className="flex gap-0.5 justify-center">
+                  {dayEvents.slice(0, 2).map((e) => (
+                    <span key={e.id} className="text-sm leading-none" title={e.title}>
+                      {e.emoji}
+                    </span>
+                  ))}
+                  {dayEvents.length > 2 && (
+                    <span className="text-[10px] text-gray-400 leading-none">+{dayEvents.length - 2}</span>
+                  )}
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Search, Plus, Users, Lock, X, Eye, EyeOff, Crown, Tag, ChevronRight, RefreshCw, Bell, CheckSquare, Square, FileText, MessageCircle, ThumbsUp, UserPlus, ShieldCheck, ArrowRight, ListTodo } from 'lucide-react';
@@ -487,15 +487,39 @@ export default function CrewsPage() {
     });
   }, [myCrews, mySearch, myCategory]);
 
-  const { data: publicCrews } = useQuery<Crew[]>({
+  const {
+    data: publicCrewsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['crews', 'search', expSearch, expCategory],
-    queryFn: () => {
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
       const params = new URLSearchParams();
       if (expSearch) params.set('q', expSearch);
       if (expCategory) params.set('cat', expCategory);
+      if (pageParam) params.set('cursor', pageParam);
       return api.get(`/crews?${params.toString()}`).then((r) => r.data);
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage: any) => lastPage.hasMore ? lastPage.nextCursor : undefined,
   });
+
+  const publicCrews = useMemo(
+    () => publicCrewsData?.pages.flatMap((p: any) => p.data) ?? [],
+    [publicCrewsData],
+  );
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage(); },
+      { rootMargin: '200px' },
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ background: '#f7f8fa' }}>
@@ -514,7 +538,7 @@ export default function CrewsPage() {
                     setRefreshing(true);
                     await Promise.all([
                       qc.invalidateQueries({ queryKey: ['my-crews'] }),
-                      qc.invalidateQueries({ queryKey: ['crews'] }),
+                      qc.resetQueries({ queryKey: ['crews', 'search'] }),
                     ]);
                     setTimeout(() => setRefreshing(false), 600);
                   }}
@@ -592,18 +616,25 @@ export default function CrewsPage() {
                     q={expQ} onQChange={setExpQ} onSearch={() => setExpSearch(expQ)}
                     selectedCategory={expCategory} onCategoryChange={setExpCategory}
                   />
-                  {publicCrews && publicCrews.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {publicCrews.map((crew) => (
-                        <CrewCard
-                          key={crew.id}
-                          crew={crew}
-                          isMine={myCrewIds.has(crew.id)}
-                          onClick={() => !myCrewIds.has(crew.id) && setJoiningCrew(crew)}
-                        />
-                      ))}
-                    </div>
-                  ) : publicCrews?.length === 0 ? (
+                  {publicCrews.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {publicCrews.map((crew) => (
+                          <CrewCard
+                            key={crew.id}
+                            crew={crew}
+                            isMine={myCrewIds.has(crew.id)}
+                            onClick={() => !myCrewIds.has(crew.id) && setJoiningCrew(crew)}
+                          />
+                        ))}
+                      </div>
+                      <div ref={loadMoreRef} className="py-2 flex justify-center">
+                        {isFetchingNextPage && (
+                          <div className="h-5 w-5 border-2 border-gray-200 border-t-primary-400 rounded-full animate-spin" />
+                        )}
+                      </div>
+                    </>
+                  ) : publicCrewsData ? (
                     <div className="py-16 text-center">
                       <p className="text-sm font-semibold text-gray-500">크루가 없습니다</p>
                       <p className="text-xs text-gray-400 mt-1">다른 키워드나 카테고리로 찾아보세요</p>
@@ -615,7 +646,7 @@ export default function CrewsPage() {
           </div>
 
           {/* ── 오른쪽 사이드바 ── */}
-          <div className="hidden xl:flex flex-col gap-4">
+          <div className="hidden xl:flex flex-col gap-4 sticky top-6 self-start">
             <PomodoroTimer />
             <MiniCalendar />
             <RecentNotificationsPanel />

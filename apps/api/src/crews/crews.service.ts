@@ -41,8 +41,9 @@ export class CrewsService {
     @Inject(forwardRef(() => ChatGateway)) private chatGateway: ChatGateway,
   ) {}
 
-  async search(q?: string, cat?: string, sort = 'popular') {
-    return this.prisma.crew.findMany({
+  async search(q?: string, cat?: string, sort = 'popular', cursor?: string) {
+    const TAKE = 20;
+    const crews = await this.prisma.crew.findMany({
       where: {
         isDeleted: false,
         visibility: { in: ['PUBLIC', 'PASSWORD'] },
@@ -51,8 +52,12 @@ export class CrewsService {
       },
       select: CREW_SELECT,
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: TAKE + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
+    const hasMore = crews.length > TAKE;
+    const data = hasMore ? crews.slice(0, TAKE) : crews;
+    return { data, nextCursor: hasMore ? data[data.length - 1].id : null, hasMore };
   }
 
   async getMemberTodos(requesterId: string, crewId: string, userId: string, date: string) {

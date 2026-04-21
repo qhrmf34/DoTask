@@ -18,7 +18,7 @@ export class AuthController {
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: any) {
     const { accessToken, refreshToken } = await this.authService.register(dto);
     this.setRefreshCookie(res, refreshToken);
-    return { accessToken, refreshToken };
+    return { accessToken };
   }
 
   @Public()
@@ -33,16 +33,7 @@ export class AuthController {
       req.user.role,
     );
     this.setRefreshCookie(res, refreshToken);
-    return { accessToken, refreshToken };
-  }
-
-  @Public()
-  @Post('refresh-token')
-  @HttpCode(HttpStatus.OK)
-  async refreshWithToken(@Body('refreshToken') token: string) {
-    if (!token) throw new BadRequestException('refreshToken이 필요합니다.');
-    const { accessToken, refreshToken } = await this.authService.refreshWithToken(token);
-    return { accessToken, refreshToken };
+    return { accessToken };
   }
 
   @Public()
